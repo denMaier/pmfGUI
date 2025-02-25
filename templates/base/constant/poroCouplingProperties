@@ -1,0 +1,64 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      poroCouplingProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+poroSolidInterface poroSolid;
+
+varSatPoroSolidCoeffs
+{
+    iterations      100;
+    convergence
+    {
+        "D"             max 0.0005;
+        "p"             max 100;
+    }
+    writeResidualField yes;
+    performanceLog  true;
+    enabled         1;
+    maxIterAbort    false;
+    interval        0;
+    infoFrequency   1;
+    onLoop          0 ( );
+    onConverged     0 ( );
+    onEnd           0 ( );
+}
+
+poroSolidCoeffs
+{
+    iterations      100;
+    convergence
+    {
+        "D"             max 0.0005;
+        "p"             max 100;
+    }
+    writeResidualField yes;
+    performanceLog  true;
+    enabled         1;
+    maxIterAbort    false;
+    interval        0;
+    infoFrequency   1;
+    onLoop          0 ( );
+    onConverged     0 ( );
+    onEnd           0 ( );
+}
+
+sharedMesh      true;
+
+consistent      true;
+
+porosityConstant true;
+
+// ************************************************************************* //

@@ -1,0 +1,35 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+solidModel     linearGeometryTotalDisplacement; // Dies ist der Löser für kleine Verformungen und mit der Gesamtverschiebung D als Variable, es gibt duzende mehr, Infos sind bei solids4Foam zu finden.
+
+// = coupledPoroLinGeom ?
+
+linearGeometryTotalDisplacementCoeffs
+{
+   nCorrectors     3;                     // Maximum number of momentum correctors (Picard Loop)
+
+   solutionTolerance 1e-06;                  // Solution tolerance for displacement
+
+   alternativeTolerance 1e-06;               // Alternative solution tolerance for displacement
+
+   materialTolerance 1e-08;                  // Material law solution tolerance
+
+   "infoFrequency"   1;                      // Write frequency for the residuals
+}
+
+
+// ************************************************************************* //

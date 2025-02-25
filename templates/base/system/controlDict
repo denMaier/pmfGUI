@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         30; //1.0;
+
+deltaT          1;
+
+writeControl    timeStep;
+
+writeInterval   1; //4;
+
+graphFormat     gnuplot;
+
+application     poroMechanicalFoam;
+
+solid
+{
+  region solid;
+}
+
+poroFluid
+{
+  region poroFluid;
+} 
+
+functions
+{
+#include functionsDict
+}
+
+
+// ************************************************************************* //

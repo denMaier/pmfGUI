@@ -1,0 +1,84 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.0                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      poroHydraulicProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+// Modellierung der funktionalen Zusammenhänge zwischen Sättigungsgrad und Saugspannung //
+
+SWCC	//saturated;           
+        vanGenuchten;        
+        //brooksCorey;         
+
+// Modellierung der Speichereigenschaften des Bodens/Geomaterials //
+
+StorageModel    KPrime;             
+                //montenegro;         
+                //storageCoeff;       
+ 		
+                href        href [ 0 1 0 0 0 0 0] 14;                   // [m] Referenzhöhe falls hydr. Potential als Porenwasserüberdruck aufgefasst, ansonsten href=0 
+                gamma       gamma [ 1 -2 -2 0 0 0 0 ] (0 0 -1e04);    	// [kg/(m^2 s^3)] Wasserwichte !!!Gravitationsrichtung beachten!!! 
+                k           k [ 0 1 -1 0 0 0 0 ] 1e-4;                  // [m/s] Durchlässigkeit bei Vollsättigung 
+                n           n [ 0 0 0 0 0 0 0] 0.4;	                    // [-] Porosität 
+
+storageCoeffCoeffs
+{                                                  
+     Ss          Ss [ -1 1 2 0 0 0 0 ] 1e-6;     // [1/Pa] Speicherkoeffizient: Kehrwert der Kompressionssteifigkeit von Wasser
+     // Ss          Ss [ 0 -1 0 0 0 0 0 ] 1e-3;  // [1/m] Speicherkoeffizient: Kehrwert der Kompressionssteifigkeit von Wasser
+}
+
+KPrimeCoeffs
+{
+  pDependent  no;   //yes;                       // wenn yes: Steifigkeit von Gas in Anhängigkeit des Drucks wird berücksichtigt
+              
+  p_At        p_At [ 1 -1 -2 0 0 0 0 ] 1e5;      // [Pa] Atmosphärendruck  
+  Kw          Kw   [ 1 -1 -2 0 0 0 0 ] 2.08e9;    // [Pa] Kompressionsmodul von Wasser  //2.08e5 in m 
+  Sw_0         Sw_0  [ 0 0 0 0 0 0 0 ]   0.90;     // [-] Sättigung am Lufteintrittspunkt (hier immer p=0 Pa oder m)
+
+  //p_At      p_At [ 0 1 0 0 0 0 0 ]   10;       // [m] Atmosphärendruck  !!! falls pHead m als Einheit !!!
+  //Kw        Kw   [ 0 1 0 0 0 0 0 ]   2.1e5;    // [m] Kompressionsmodul von Wasser  !!! falls pHead 1/m als Einheit !!!
+}
+
+montenegroCoeffs	
+{
+ S_e        S_e  [ 0 0 0 0 0 0 0 ]   0.98;       // [-] Wassergehaöt bei einem Druck von p_e 
+ p_e        p_e  [ 1 -1 -2 0 0 0 0 ] -0;         // [Pa] Druck beim Lufteintrittspunkt, bzw. Punkt an dem Sättigung gemessen wurde
+ p_At       p_At [ 1 -1 -2 0 0 0 0 ] 1e5;        // [Pa] Atmosphärischer Druck
+
+ //p_e      p_e  [ 0 1 0 0 0 0 0 ]   -0;         // [m] Druck beim Lufteintrittspunkt, bzw. Punkt an dem Sättigung gemessen wurde
+ //p_At     p_At [ 0 1 0 0 0 0 0 ]   10;         // [m] Atmosphärischer Druck
+}
+
+vanGenuchtenCoeffs
+{
+  n           n     [ 0 0 0 0 0 0 0 ]  3.1;     // [-] van Genuchten Parameter n (empirisch bestimmt)
+  alpha       alpha [ -1 1 2 0 0 0 0 ] 3.3e-4;    // [1/Pa] van Genuchten Parameter alpha  
+  S_0        Sw_0  [ 0 0 0 0 0 0 0 ]  1;    // [-] Sättigung bei 0 rel. Gesamtdruck
+  S_r        Sw_r  [ 0 0 0 0 0 0 0 ]  0.0857;    // [-] Residuale Sättigung in "trockenem" Boden
+
+  //alpha     alpha [ 0 -1 0 0 0 0 0 ] 1;       // [1/m] van Genuchten Parameter alpha  
+}
+
+brooksCoreyCoeffs
+{
+  n          n       [ 0 0 0 0 0 0 0 ]   2.1;    // [-] Brooks&Corey Exponent n
+  p_e        p_e     [ 1 -1 -2 0 0 0 0 ] -4400;  // [Pa] Saugspannung p_e = 0! bei Lufteintritt 
+  S_e        theta_e [ 0 0 0 0 0 0 0 ]   0.95;   // [-] Sättigung bei p_e Saugspannung 
+  S_r        theta_r [ 0 0 0 0 0 0 0 ]   0.095;  // [-] Residuale Sättigung in "trockenem" Boden
+
+  //p_e      p_e     [ 0 1 0 0 0 0 0 ]   -0.44;  // [m] Saugspannung p_e = 0! bei Lufteintritt 
+}
+
+// ************************************************************************* //

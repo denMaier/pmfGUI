@@ -1,0 +1,72 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.2                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  | For copyright notice see file Copyright         |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant/poroFluid";
+    object      poroFluidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Auswahl des Fluidmodells
+
+poroFluidModel  poroFluid;                 
+
+varSatPoroFluidCoeffs
+{
+    iterations      1000;
+    convergence
+    {
+        "S"             max 0.001;
+    }
+    solutionAlgorithm Standard;
+    enabled         1;
+    maxIterAbort    false;
+    interval        0;
+    infoFrequency   1;
+    onLoop          0 ( );
+    onConverged     0 ( );
+    onEnd           0 ( );
+    performanceLog  false;
+    writeResidualField false;
+
+      // Lösungsmethode für Richards-Gleichung (Behandlung des dS/dt Terms)
+      solutionAlgorithm  standard;
+      
+      // Falls Casulli gewählt wurde:
+      Casulli
+      {
+        CasulliTolerance 1e-5;
+        CasulliInnerCorrectors 1000;
+        CasulliOuterCorrectors 1000;	
+      }
+       
+}
+
+poroFluidCoeffs
+{
+    iterations      1000;
+    convergence
+    {
+        "S"             max 0.001;
+    }
+    solutionAlgorithm Standard;
+    enabled         1;
+    maxIterAbort    false;
+    interval        0;
+    infoFrequency   1;
+    onLoop          0 ( );
+    onConverged     0 ( );
+    onEnd           0 ( );
+    performanceLog  false;
+    writeResidualField false;
+}
+
+// ************************************************************************* //

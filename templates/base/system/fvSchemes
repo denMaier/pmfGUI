@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     3.0                                |
+|   \\  /    A nd           | Web:         http://www.extend-project.de       |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+d2dt2Schemes
+{
+    default         steadyState;
+                    // Euler für dynamische Berechnungen
+}
+
+ddtSchemes
+{
+    default         	Euler;
+                    // Für manche Terme ist in Abhängigkeit des Lösungsalgorithmus CrankNicolson interessant!  
+}
+
+gradSchemes
+{
+    default            extendedLeastSquares 0;
+                       // Für einige (oder alle Gradienten könnte das neue iterative Gauss Schema benutzt werden (siehe Openfoam Dokumentation)
+}
+
+divSchemes
+{
+    default         Gauss linear corrected;
+    div(sigma)      Gauss linear corrected;
+}  
+
+laplacianSchemes
+{
+    default         Gauss linear limited corrected 0.33;
+    
+} 
+
+snGradSchemes
+{
+    default            limited corrected 0.33;
+} 
+
+interpolationSchemes
+{
+   default            linear;
+   interpolate(k) harmonic skewCorrected 1;
+   interpolate(kr) linear skewCorrected 1;
+}
+
+// ************************************************************************* //

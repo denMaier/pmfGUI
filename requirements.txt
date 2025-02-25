@@ -1,0 +1,6 @@
+streamlit
+foamlib
+matplotlib
+numpy
+pathlib
+stpyvista

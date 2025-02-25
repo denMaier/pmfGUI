@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | foam-extend: Open Source CFD                    |
+|  \\    /   O peration     | Version:     4.1                                |
+|   \\  /    A nd           | Web:         http://www.foam-extend.org         |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Vereinfachungen für Scheiben, für uns nie der Fall! (= Ebener Spannungszustand)
+planeStress     no;
+                // yes;
+
+
+mechanical
+( 
+	Embankment
+	{
+		type      varSatPoroMechanicalLaw;
+
+       		//readPressureFromDisk true;
+		//n n [0 0 0 0 0 0 0] 0.35;
+		effectiveStressModel       suctionCutOff;
+					//terzaghi;  // Berücksichtigung des Porenwasserdrucks nur unterhalb des Grundwasserspiegels (p=0)
+					// bishop;   // Berücksichtigung des Porenwasserdrucks abgemindert mit Sättigung
+					// uniform;  // Berücksichtigung des Porenwasserdrucks ungeachtet der Sättigung
+		
+		
+		buoyancy true;
+		
+		rho      rho [1 -3 0 0 0 0 0] 2100;       // [kg/m^3] Important parameter - set rho = 0 for weightless soil
+		  
+		effectiveStressMechanicalLaw
+		{
+			//type            linearElasticMohrCoulombPlasticDilationCutoff;
+			type            abaqusUmatMohrCoulomb;
+			E               E [ 1 -1 -2 0 0 0 0 ] 37143000;
+			nu              nu [0 0 0 0 0 0 0] 0.3;
+			frictionAngle   frictionAngle [0 0 0 0 0 0 0] 35;
+			dilationAngle   dilationAngle [0 0 0 0 0 0 0] 1e-3;
+			cohesion        cohesion [1 -1 -2 0 0 0 0] 1e5;
+			//e0				e0 [0 0 0 0 0 0 0] 0.3;
+			//e_crit			e_crit [0 0 0 0 0 0 0] 100000;
+		}
+	}
+    
+	Revetment
+	{
+		type      varSatPoroMechanicalLaw;
+       		//readPressureFromDisk true;
+		//n n [0 0 0 0 0 0 0] 0.55;
+		effectiveStressModel   suctionCutOff;
+				       //terzaghi;  // Berücksichtigung des Porenwasserdrucks nur unterhalb des Grundwasserspiegels (p=0)
+				       // bishop;   // Berücksichtigung des Porenwasserdrucks abgemindert mit Sättigung
+				       // uniform;  // Berücksichtigung des Porenwasserdrucks ungeachtet der Sättigung
+		
+		
+		buoyancy true;
+		rho      rho [1 -3 0 0 0 0 0] 2100;       // [kg/m^3] Important parameter - set rho = 0 for weightless soil
+		  
+		effectiveStressMechanicalLaw
+		{
+       		     //  type            linearElasticMohrCoulombPlasticDilationCutoff;
+			     type            abaqusUmatMohrCoulomb;
+		       E               E [ 1 -1 -2 0 0 0 0 ] 37143000;
+		       nu              nu [0 0 0 0 0 0 0] 0.3;
+                        frictionAngle   frictionAngle [0 0 0 0 0 0 0] 30;
+                        dilationAngle   dilationAngle [0 0 0 0 0 0 0] 1e-3;
+                        cohesion        cohesion [1 -1 -2 0 0 0 0] 1e5;
+                        //e0                              e0 [0 0 0 0 0 0 0] 0.3;
+                        //e_crit                  e_crit [0 0 0 0 0 0 0] 100000;
+		}
+	}
+);
+
+
+// ************************************************************************* //

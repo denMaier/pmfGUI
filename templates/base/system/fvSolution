@@ -1,0 +1,60 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM Extend Project: Open Source CFD        |
+|  \\    /   O peration     | Version:  1.6-ext                               |
+|   \\  /    A nd           | Web:      www.extend-project.de                 |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+     p_rgh
+    {
+        solver              GAMG;         // General geometric-algebraic multi-grid solver
+        tolerance           1e-08;        // absolutes Konvergenzkriterium
+        relTol              0.001;         // relatives Konvergenzkriterium
+        smoother            DIC; //GaussSeidel;  // Solvermethode
+        cacheAgglomeration  true;      // 
+        nCellsInCoarsestLevel 20;     // Anzahl der Zellen im dem gröbsten Gitter
+        agglomerator        faceAreaPair; // Vergröberung erfolgt geometrisch (Algebraisch: algebraic)
+        mergeLevels         10;            // wie viele Zelllevel sollen gelöst werden
+    }
+ 
+     D
+    {   ///// Achtung: es wurden nicht physikalische Ergebnisse mit diesem Löser erziehlt, Benutzung auf eigene Gefahr!!////
+        solver          PBiCICG; //PCG; 
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
+ 
+    pHead
+    {
+        solver          GAMG;         // General geometric-algebraic multi-grid solver
+        tolerance       1e-08;        // absolutes Konvergenzkriterium
+        relTol          0.001;         // relatives Konvergenzkriterium
+        smoother        GaussSeidel;  // Solvermethode
+        cacheAgglomeration true;      // 
+        nCellsInCoarsestLevel 20;     // Anzahl der Zellen im dem gröbsten Gitter
+        agglomerator    faceAreaPair; // Vergröberung erfolgt geometrisch (Algebraisch: algebraic)
+        mergeLevels     10;            // wie viele Zelllevel sollen gelöst werden
+    }
+} 
+
+relaxationFactors{
+   D 1.0;
+   p_rgh 1.0;
+   pHead 1.0;
+}    // Relaxation der Felder nach Lösung (oft nötig durch explizite Kopplung) Infos zu finden in jedem guten FV Buch ;)
+
+// ************************************************************************* //
