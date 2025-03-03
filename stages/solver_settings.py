@@ -1,11 +1,10 @@
+from panel.io.server import get_server
 import streamlit as st
-from foamlib import FoamCase
-from foamlib import FoamFile
+from foamlib import FoamCase, FoamFile
 from pathlib import Path
-#from solvers.solver import MechanicalLaw, Parameter, MECHANICAL_LAWS
-from state import get_case, get_selected_case, set_solver_type, get_solver_type, get_case_data, get_path
+from state import *
 from render_inputs import render_input_element
-import os 
+import os
 import pandas as pd
 
 solver_options = {
@@ -30,167 +29,129 @@ solver_type_map = {
     "solid": "Mechanics",
     "poroFluid": "Groundwater",
     "poroSolid": "Coupled",
-    "": None
+    "None": "Mechanics" # Default
 }
+
+poroFluidModelTypes = {
+    "saturated": "poroFluid",
+    "unsaturated":"varSatPoroFluid"
+}
+
+def get_solver_state_from_case(case_dir: str):
+    case_data = get_case_data()
+    solver_type = case_data["Files"]["physicsProperties"]["type"]
+    set_solver_type(solver_type_map[solver_type])
+    if get_solver_type() in ["Groundwater","Coupled"]:
+        if Path(case_data["Files"]["poroFluidProperties"]).exists():
+            if case_data["Files"]["poroFluidProperties"] == "varSatPoroFluid":
+                case_data['Solver']["unsaturated"] = True
 
 def show_settings(file: FoamFile):
     with Path(file).open() as f:
         st.code(f.open(),language="cpp")
 
-def entry():
-    foamcase = get_case()
-    physicsProperties = get_case_data()["Solver"]["physicsProperties"]
-    selected_solver = getSolver()
-    if st.button("Select Solver"):
-        set_solver_type(selected_solver)
-        physicsProperties["type"] = solver_options[selected_solver]["type"] # Moved inside set_solver_type
-        st.rerun()
+def main():
+    case_data = get_case_data()
+    with case_data["Files"]["physicsProperties"] as physicsProperties:
+        if get_solver_type() is None:
+            selected_solver = st.selectbox("Select Solver:", list(solver_options.keys()))  # Use keys() for clarity
+        else:
+            selected_solver = st.selectbox("Select Solver:", list(solver_options.keys()),
+                                        index=list(solver_options.keys()).index(get_solver_type()))
+        if st.button("Select Solver"):
+            physicsProperties.type = solver_options.selected_solver.type
+            set_solver_type(selected_solver)
+            st.rerun()
     if get_solver_type() is not None:
         st.subheader("Selected: " + get_solver_type())
-        set_solver_type_settings(foamcase, get_solver_type())
+        set_solver_type_settings()
 
-def getSolver():
-    if get_solver_type() is None:
-        selected_solver = st.selectbox("Select Solver:", list(solver_options.keys()))  # Use keys() for clarity
-    else:
-        selected_solver = st.selectbox("Select Solver:", list(solver_options.keys()),
-                                    index=list(solver_options.keys()).index(get_solver_type()))
-    return selected_solver
-        
-def get_solver_state_from_case():
-    foamcase = get_case()
-    get_case_data()["Solver"]["physicsProperties"] = foamcase.file(get_path("Solver","physicsProperties"))
-    solver_type = get_case_data()["Solver"]["physicsProperties"]["type"]
-    set_solver_type(solver_type_map[solver_type])
-    
-    if get_solver_type() in ["Mechanics","Coupled"]:
-        if os.path.exists(get_path("Solver","solidProperties")):
-            get_case_data()["Solver"]["solidProperties"] = foamcase.file(get_path("Solver","solidProperties"))
-    if get_solver_type() in ["Groundwater","Coupled"]:
-        if os.path.exists(get_path("Solver","poroFluidProperties")):
-            get_case_data()["Solver"]["poroFluidProperties"] = foamcase.file(get_path("Solver","poroFluidProperties"))
-    if get_solver_type() == "Coupled":
-        if os.path.exists(get_path("Solver","poroCouplingProperties")):
-            get_case_data()["Solver"]["poroCouplingProperties"] = foamcase.file(get_path("Solver","poroCouplingProperties"))
+@st.fragment
+def set_solver_type_settings():
+    case_data = get_case_data()
+    selected_solver = get_solver_type()
+    with (
+        case_data["Files"]['fvSchemes'] as fvSchemes,
+        case_data["Files"]['fvSolution'] as fvSolution,
+        case_data["Files"]['poroCouplingProperties'] as poroCouplingProperties,
+        case_data["Files"]["poroFluidProperties"] as poroFluidProperties,
+        case_data["Files"]['solidProperties'] as solidProperties,
+        st.form("Solver Settings")
+    ):
 
-@st.fragment        
-def set_solver_type_settings(foamcase: FoamCase, selected_solver: str):         
-        
-    with st.form("Solver Settings"):
-        
-        control_dict = foamcase.control_dict
-        fv_schemes = foamcase.fv_schemes
-        fv_solution = foamcase.fv_solution
-            
         tabNames = ["Linear Solvers","Schemes"] + solver_options[selected_solver]["tabs"]
         tabs = st.tabs(tabNames)
-        
-        data = {}
-        data["fv_solution"] = {}
-        data["fv_solution"]["relaxationFactors"] = {}
-        data["fv_schemes"] = {}
-        data["fv_schemes"]["ddtSchemes"] = {}
-        data["solidProperties"] = {}
-        data["solidProperties"]["linearGeometryTotalDisplacementCoeffs"] = {}
-        data["poroFluidProperties"] = {}
-        data["poroCouplingProperties"] = {}
-        
+
         with (
-            tabs[0]
+            tabs[0] #fvSolution
         ):
             st.subheader("Relaxation")
             for field in solver_options[selected_solver]["fields"]:
-                data["fv_solution"]["relaxationFactors"][field] = st.slider(
+                fvSolution["relaxationFactors"][field] = st.slider(
                     field,min_value=0.0,
                     max_value=1.2,
                     step=0.01,
-                    value=fv_solution["relaxationFactors"].as_dict()[field]
+                    value=fvSolution["relaxationFactors"].as_dict()[field]
                     )
         with (
-            tabs[1]
+            tabs[1] # fvSchemes
         ):
             st.subheader("Time")
             if selected_solver in ["Groundwater","Coupled"]:
                 ddt_options = ["steadyState", "Euler", "CrankNicolson 0.9", "backward"]
-                data["fv_schemes"]["ddtSchemes"]["default"] = st.selectbox("default", ddt_options)
+                fvSchemes["ddtSchemes"]["default"] = st.selectbox("default", ddt_options, index=ddt_options.index(fvSchemes["ddtSchemes"]["default"]))
             if selected_solver in ["Mechanics,Coupled"]:
-                if st.checkbox("Dynamic Calculation"):
+                if st.toggle("Dynamic Calculation"):
                     st.write("At the moment no dynamic calculations in the GUI, please edit end run the case manually.")
 
         if selected_solver in ["Mechanics","Coupled"]:
-            get_case_data()["Solver"]["solidProperties"] = foamcase.file(get_path("Solver","solidProperties"))
             with (
-                tabs[tabNames.index("Mechanics")],
-                get_case_data()["Solver"]["solidProperties"] as solidProperties,
+                tabs[tabNames.index("Mechanics")]
             ):
-                solid_dict = solidProperties["linearGeometryTotalDisplacementCoeffs"].as_dict()
+                solid_dict = solidProperties["linearGeometryTotalDisplacementCoeffs"]
                 for key, value in solid_dict.items():
                     new_value = render_input_element(key,value)
-                    data["solidProperties"]["linearGeometryTotalDisplacementCoeffs"][key] = new_value
-                
+                    solidProperties["linearGeometryTotalDisplacementCoeffs"][key] = new_value
+
         if selected_solver in ["Groundwater","Coupled"]:
-            get_case_data()["Solver"]["poroFluidProperties"] = foamcase.file(get_path("Solver","poroFluidProperties"))
             with (
-                tabs[tabNames.index("Hydraulics")],
-                get_case_data()["Solver"]["poroFluidProperties"] as poroFluidProperties,
+                tabs[tabNames.index("Hydraulics")]
             ):
-                fluidmodel = st.selectbox("Model",["saturated","unsaturated"])
-                fluidmodel = "poroFluid" if fluidmodel == "saturated" else "varSatPoroFluid"    
-                data["poroFluidProperties"]["poroFluidModel"] = fluidmodel
-                coeffsDict = poroFluidProperties[fluidmodel+"Coeffs"]
-                data["poroFluidProperties"][fluidmodel+"Coeffs"] = {}
-                data["poroFluidProperties"][fluidmodel+"Coeffs"]["iterations"] = st.number_input("iterations",0, value=coeffsDict["iterations"], step=1)
+                fluidmodel = st.selectbox("Model",list(poroFluidModelTypes.keys()),index=list(poroFluidModelTypes.values()).index(poroFluidProperties["poroFluidModel"]))
+                fluidmodel = poroFluidModelTypes[fluidmodel]
+                poroFluidProperties["poroFluidModel"] = fluidmodel
+                coeffsDict = poroFluidProperties[f"{fluidmodel}Coeffs"]
+                poroFluidProperties[f"{fluidmodel}Coeffs"]["iterations"] = st.number_input("iterations",0, value=coeffsDict["iterations"], step=1)
                 algo_options = ["standard","Casulli","LScheme","Celia"]
                 if fluidmodel=="varSatPoroFluid":
-                    data["poroFluidProperties"]["poroFluidModel"][coeffsDict]["solutionAlgorithm"] = st.selectbox(
+                    poroFluidProperties[fluidmodel+"Coeffs"]["solutionAlgorithm"] = st.selectbox(
                         "Algorithm",
                         algo_options,
                         index=algo_options.index(coeffsDict["solutionAlgorithm"])
                         )
                 st.write("Convergence Criteria")
                 convergence = makeConvergence(coeffsDict["convergence"].as_dict())
-                data["poroFluidProperties"][fluidmodel+"Coeffs"]["convergence"] = {}
+                poroFluidProperties[f"{fluidmodel}Coeffs"]["convergence"] = {}
                 for key, value in convergence.items():
                     new_value = str(value[0])+" "+str(value[1])
-                    data["poroFluidProperties"][fluidmodel+"Coeffs"]["convergence"][key] = new_value
-        
+                    poroFluidProperties[f"{fluidmodel}Coeffs"]["convergence"][key] = new_value
+
         if selected_solver == "Coupled":
-            get_case_data()["Solver"]["poroCouplingProperties"] = foamcase.file(get_path("Solver","poroCouplingProperties"))
             with (
-                tabs[tabNames.index("Coupling")],
-                get_case_data()["Solver"]["poroCouplingProperties"] as poroCouplingProperties,
+                tabs[tabNames.index("Coupling")]
             ):
-                poroSolidInterface = "poroSolid" if data["poroFluidProperties"]["poroFluidModel"] == "poroFluid" else "varSatPoroSolid"    
-                data["poroCouplingProperties"]["poroSolidInterface"] = poroSolidInterface
-                coeffsDict = poroCouplingProperties[poroSolidInterface+"Coeffs"]
-                data["poroCouplingProperties"][poroSolidInterface+"Coeffs"] = {}
-                data["poroCouplingProperties"][poroSolidInterface+"Coeffs"]["iterations"] = st.number_input("iterations",0, value=coeffsDict["iterations"], step=1)
+                poroSolidInterface = "poroSolid" if poroFluidProperties["poroFluidModel"] == "poroFluid" else "varSatPoroSolid"
+                poroCouplingProperties["poroSolidInterface"] = poroSolidInterface
+                coeffsDict = poroCouplingProperties[f"{poroSolidInterface}Coeffs"]
+                poroCouplingProperties[f"{poroSolidInterface}Coeffs"]["iterations"] = st.number_input("iterations",0, value=coeffsDict["iterations"], step=1)
                 st.write("Convergence Criteria")
                 convergence = makeConvergence(coeffsDict["convergence"].as_dict())
-                data["poroCouplingProperties"][poroSolidInterface+"Coeffs"]["convergence"] = {}
                 for key, value in convergence.items():
                     new_value = str(value[0])+" "+str(value[1])
-                    data["poroCouplingProperties"][poroSolidInterface+"Coeffs"]["convergence"][key] = new_value
+                    poroCouplingProperties[f"{poroSolidInterface}Coeffs"]["convergence"][key] = new_value
 
-                
         if st.form_submit_button("Save Solver Settings"):
-            try:
-                solver_data = get_case_data()["Solver"]
-
-                foamcase.fv_solution.update(data["fv_solution"])
-                foamcase.fv_schemes.update(data["fv_schemes"])
-                if solver_data["solidProperties"] is not None:
-                    solidProperties = solver_data["solidProperties"]
-                    solidProperties.update(data["solidProperties"])
-                if solver_data["poroFluidProperties"] is not None:
-                    poroFluidProperties = solver_data["poroFluidProperties"]
-                    poroFluidProperties.update(data["poroFluidProperties"])
-                if solver_data["poroCouplingProperties"] is not None:
-                    poroCouplingProperties = solver_data["poroCouplingProperties"]
-                    poroCouplingProperties.update(data["poroCouplingProperties"])
                 st.success("Solver settings saved.")
-            except Exception as e:
-                print(f"An unexpected error occurred: {e}")    
 
 
 def makeConvergence(convergence: dict):

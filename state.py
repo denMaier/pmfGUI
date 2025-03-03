@@ -2,6 +2,7 @@ import streamlit as st
 from foamlib import FoamCase
 from foamlib import FoamFile
 from pathlib import Path
+import pyvista as pv
 
 def initialize_state():
     """Initializes the application's global state."""
@@ -9,41 +10,61 @@ def initialize_state():
         st.session_state.case_data = {}
         case_data = st.session_state.case_data
         case_data["Case"] = None  # Initialize Case
-        case_data["Case Selection"] = {}
-        case_data["Case Selection"]["selected_case"] = None  # Initialize ALL values
-        case_data["Case Selection"]["case_dir"] = None  # Initialize ALL values
-        case_data["Mesh"] = {}
-        case_data["Mesh"]["available"] = True
-        case_data["Mesh"]["Paths"] = {
-            "polyMesh": "constant/polyMesh",
+        case_data["Paths"] = {
             "cellZones": "constant/polyMesh/cellZones",
-            "boundary": "constant/polyMesh/boundary"           
-        }
-        case_data["Mesh"]["cellZones"] = {}
-        case_data["Mesh"]["boundary"] = {}
-        case_data["Solver"] = {}
-        case_data["Solver"]["selected"] = None  # Initialize ALL values
-        case_data["Solver"]["fvSolution"] = None
-        case_data["Solver"]["fvSchemes"] = None
-        case_data["Solver"]["physicsProperties"] = None
-        case_data["Solver"]["solidProperties"] = None
-        case_data["Solver"]["poroFluidProperties"] = None
-        case_data["Solver"]["poroCouplingProperties"] = None
-        case_data["Solver"]["Paths"] = {
+            "boundary": "constant/polyMesh/boundary",
             "physicsProperties": "constant/physicsProperties",
             "solidProperties": "constant/solid/solidProperties",
             "poroFluidProperties": "constant/poroFluid/poroFluidProperties",
-            "poroCouplingProperties": "constant/poroCouplingProperties"
-        }
-        case_data["Materials"] = {}
-        case_data["Materials"]["mechanicalProperties"] = None
-        case_data["Materials"]["hydraulicProperties"] = None
-        case_data["Materials"]["Paths"] = {
+            "poroCouplingProperties": "constant/poroCouplingProperties",
             "mechanicalProperties": "constant/solid/mechanicalProperties",
             "poroHydraulicProperties": "constant/poroFluid/poroHydraulicProperties"
         }
-        case_data["Materials"]["cell_zones_data"] = {}
-
+        case_data["Files"] = {
+                "cellZones": None,
+                "boundary": None,
+                "physicsProperties": None,
+                "solidProperties": None,
+                "poroFluidProperties": None,
+                "poroCouplingProperties": None,
+                "mechanicalProperties": None,
+                "hydraulicProperties": None,
+                "fvSolution": None,
+                "fvSchemes": None,
+                "controlDict": None,
+                "blockMeshDict": None,
+                "dotFoam": None
+            }
+        case_data["Case Selection"] = {
+                "selected_case": None,
+                "case_dir": None
+        }
+        case_data["Mesh"] = {
+                    "cellZones": {}, # Since file format is hard to read
+                    "showMeshVis": False,
+                    "reader": None, # pyVista Reader
+                    "internal": None, # Read with pyVista
+                    "boundaries": None, # Read with pyVista
+                    "df_vertices": None, # For 2D Mesh generator
+                    "df_edges": None, # For 2D Mesh generator
+                    "boundary": {}, # For 2D Mesh generator
+                    "edgeDict": None, # For 2D Mesh generator
+                    "cellSize": 0.1, # For cfMesh
+                    "nBoundaryLayers": 0 # For cfMesh
+        }
+        case_data["Solver"] = {
+                    "selected": None,  # Initialize ALL values
+                    "unsaturated": False
+                }
+        case_data["Materials"] = {
+                    "cell_zones_data": {}
+                }
+    if "vis" not in st.session_state:
+        st.session_state.vis = {}
+        vis = st.session_state.vis
+        vis["show_mesh"] = True
+        vis["bg_darkness"] = 0.35
+        vis["selected_palette"] = 'deep'
 
 #Access
 def get_case():
@@ -54,14 +75,7 @@ def get_case_data():
     """Provides access to the case_data dictionary."""
     return st.session_state.case_data
 
-def get_path(stage: str,file: str):
-    return get_case_data().get(stage).get("Paths").get(file)
-
-def set_case(case_name):
-    """Sets Case Object."""
-    st.session_state.case_data["Case"] = FoamCase(Path(case_name))
-        
-def get_selected_case():
+def get_selected_case_path():
     return get_case_data().get("Case Selection").get("case_dir")
 
 def get_selected_case_name():
@@ -71,15 +85,20 @@ def get_solver_type():
     return get_case_data()["Solver"].get("selected")
 
 def has_mesh():
-    return get_case_data().get("Mesh").get("available")
+    return Path(get_case_data()["Files"]["boundary"]).exists()
 
-# Setter and for selected_case
+def is_unsaturated():
+    return get_case_data()["Files"].poroFluidProperties["poroFluidModel"] == "varSatPoroFluid"
+
+
+# Setters and for selected_case
+def set_case(case_name):
+    """Sets Case Object."""
+    st.session_state.case_data.Case = FoamCase(Path(case_name))
+
 def set_selected_case(case_name,case_dir):
     st.session_state.case_data["Case Selection"]["selected_case"] = case_name
     st.session_state.case_data["Case Selection"]["case_dir"] = case_dir
 
-# Setter for solver_type
 def set_solver_type(solver_type):
     st.session_state.case_data["Solver"]["selected"] = solver_type
-
-
