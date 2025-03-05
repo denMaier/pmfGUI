@@ -7,7 +7,7 @@ from state import *
 
 def main_hydraulic(foamCase: FoamCase):
     """Handle the Materials stage of the workflow"""
-    cell_zones = get_case_data()["Mesh"]["cellZones"]
+    cell_zones = get_cell_zones()
     if not cell_zones:
         st.warning("No cellZones found, at least one has to be present!")
     else:
@@ -18,17 +18,22 @@ def main_hydraulic(foamCase: FoamCase):
 
             law_defaults = {"storageLaw": "storageCoeff"}
 
-            if get_case_data()["Solver"]["unsaturated"]:
+            if is_unsaturated():
                 law_defaults["SWCC"] = "saturated"
 
+            newZones = []
+            
             for law_type in list(law_defaults.keys()):
                 for tab, zone_name in zip(tabs, cell_zones):
                     with tab:
 
-                        if zone_name not in get_case_data()["Files"]['poroHydraulicProperties']:
-                            get_case_data()["Files"]['poroHydraulicProperties'][zone_name]={}
+                        poroHydraulicDict = get_file('poroHydraulicProperties').as_dict
+                        
+                        if zone_name not in poroHydraulicDict:
+                            newZones.append(zone_name)
+                            poroHydraulicDict[zone_name]={}
 
-                        zone_data = get_case_data()["Files"]['poroHydraulicProperties'][zone_name]
+                        zone_data = poroHydraulicDict[zone_name]
 
                         if law_type not in zone_data:
                             zone_data[law_type]=law_defaults[law_type]
@@ -82,6 +87,13 @@ def main_hydraulic(foamCase: FoamCase):
                             zone_data[f"{law}Coeffs"][param_name] = value
 
 
-            if st.form_submit_button("Save Hydraulic Properties"):
-                poroHydraulicProperties = Path(get_case_data()["Files"]['poroHydraulicProperties'])
-                st.success(f"Saved materialProperties to {poroHydraulicProperties}")
+            
+                        if st.form_submit_button("Save Hydraulic Properties"):
+                            with get_file('poroHydraulicProperties') as poroHydraulicProperties:
+                                for zone in cell_zones.keys():
+                                    poroHydraulicProperties[zone] = {}
+                                    for entry, value in poroHydraulicDict[zone].items():
+                                        if isinstance(value,dict):
+                                            poroHydraulicProperties[zone][entry] = {}
+                                poroHydraulicProperties.update(poroHydraulicDict)
+                                st.success(f"Saved hydraulic properties to {poroHydraulicProperties}")

@@ -25,7 +25,7 @@ d2dt2Schemes
 ddtSchemes
 {
     default         	Euler;
-                    // Für manche Terme ist in Abhängigkeit des Lösungsalgorithmus CrankNicolson interessant!  
+                    // Für manche Terme ist in Abhängigkeit des Lösungsalgorithmus CrankNicolson interessant!
 }
 
 gradSchemes
@@ -38,18 +38,18 @@ divSchemes
 {
     default         Gauss linear corrected;
     div(sigma)      Gauss linear corrected;
-}  
+}
 
 laplacianSchemes
 {
-    default         Gauss linear limited corrected 0.33;
-    
-} 
+    default         Gauss linear limited corrected 1;
+
+}
 
 snGradSchemes
 {
-    default            limited corrected 0.33;
-} 
+    default            limited corrected 1;
+}
 
 interpolationSchemes
 {

@@ -9,7 +9,7 @@ from state import *
 def main_mechanical(foamCase: FoamCase):
     """Handle the Materials stage of the workflow"""
 
-    cell_zones = get_case_data()["Mesh"]["cellZones"]
+    cell_zones = get_cell_zones()
 
     if not cell_zones:
         st.warning("No cellZones found, at least one has to be present!")
@@ -24,7 +24,7 @@ def main_mechanical(foamCase: FoamCase):
             for tab, zone_name in zip(tabs, cell_zones):
                 with tab:
 
-                    zone_data = get_case_data()["Mesh"]["cellZones"][zone_name]
+                    zone_data = get_cell_zones()[zone_name]
 
                     if zone_data["type"] not in list(MECHANICAL_LAWS.keys()):
                         zone_data["type"] = "linearElasticity"
@@ -54,10 +54,10 @@ def main_mechanical(foamCase: FoamCase):
                         zone_data["parameters"][param_name] = value
 
                 if st.form_submit_button("Generate Material Properties"):
-                    content = generate_material_properties(get_case_data()["Mesh"]["cellZones"])
-                    mechanicalProperties = Path(get_case_data()["Files"]['mechanicalProperties'])
-                    mechanicalProperties = content
-                    st.success(f"Saved materialProperties to {mechanicalProperties}")
+                    content = generate_material_properties(get_cell_zones())
+                    with get_file('mechanicalProperties') as mechanicalProperties: 
+                        mechanicalProperties["mechanical"] = content
+                        st.success(f"Saved materialProperties to {mechanicalProperties}")
 
 
 

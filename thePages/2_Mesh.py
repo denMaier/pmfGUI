@@ -48,7 +48,7 @@ else:
                 vis = st.session_state.vis
 
                 plot_foam_mesh(
-                    get_case_data()["Files"]["dotFoam"],
+                    get_file("dotFoam"),
                     vis["show_mesh"],vis["bg_darkness"],
                     vis["selected_palette"]
                 )

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import List, Union
 
-@dataclass
+@dataclass(frozen=True)
 class Parameter:
     name: str
     dimensions: str

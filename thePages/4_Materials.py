@@ -34,7 +34,7 @@ else:
             with col1:
                 main_mechanical(foamCase)
             with col2:
-                with Path(get_case_data()["Files"]['mechanicalProperties']).open() as f:
+                with get_file('mechanicalProperties').open() as f:
                     with st.expander("Current mechanicalProperties"):
                         st.code(f.read(),language="cpp")
 
@@ -45,6 +45,6 @@ else:
             with col1:
                 main_hydraulic(foamCase)
             with col2:
-                with Path(get_case_data()["Files"]['poroHydraulicProperties']).open() as f:
+                with get_file('poroHydraulicProperties').open() as f:
                     with st.expander("Current poroHydraulicProperties"):
                         st.code(f.read(),language="cpp")

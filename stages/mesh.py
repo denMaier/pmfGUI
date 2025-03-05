@@ -2,8 +2,6 @@ import streamlit as st
 from foamlib import FoamCase
 from pathlib import Path
 from state import *
-import re
-
 from stages.meshAux.helpers import *
 from stages.meshAux.make2D import *
 
@@ -21,9 +19,6 @@ def main3D():
         ],
         3
     )
-
-    load_case_cell_zones(foamCase)
-
     #set_boundary_types()
 
 def main2D():
@@ -39,10 +34,6 @@ def main2D():
         ],
         2
     )
-
-    load_case_cell_zones(foamCase)
-
-    #set_boundary_types()
 
 def select_method(foamCase: FoamCase, input_types, captions, dimensions):
     polyMeshPath = Path(foamCase)/"constant/polyMesh"
@@ -110,52 +101,10 @@ def select_method(foamCase: FoamCase, input_types, captions, dimensions):
         make2DMesh(foamCase)
 
 def set_boundary_types():
-    boundaryDict = get_case_data()["Files"]["boundary"]
+    boundaryDict = get_file("boundary")
     for key, value in boundaryDict.as_dict().items():
         with st.expander(f"{key} \t type"):
             st.write("Comming soon")
-
-def load_case_cell_zones(foamCase: FoamCase):
-    """
-    Extracts cellZone names from an OpenFOAM cellZones file,
-    handling variations in whitespace, line breaks, and the FoamFile header.
-
-    Args:
-
-    Returns:
-        list: A list of cellZone names (strings). Returns an empty list if no
-              cellZones are found or if an error occurs.
-    """
-
-    filePath = Path(get_case_data()["Files"]["cellZones"])
-
-    if not filePath.exists():
-        st.warning("No CellZones exist! Please create at least one cellZone!")
-        return
-
-    try:
-        with filePath.open() as f:
-            content = f.read()
-
-        # Regex to find cellZone names, robust to whitespace and header.
-        # We now skip the FoamFile header section.
-        match = re.search(r"FoamFile\s*\{.*?\}\s*(.*)", content, re.DOTALL)
-        if match:
-            content_after_header = match.group(1)
-            matches = re.findall(r'(\w+)\s*\{', content_after_header)
-            for zonematch in matches:
-                get_case_data()["Mesh"]["cellZones"][zonematch] = {
-                    "type": None,
-                    "parameters": {}
-                }
-        else:
-            st.error("No cellZones in cellZone file found!!")
-
-    except FileNotFoundError:
-        print(f"Error: File not found at {filePath}")
-
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
 
 def make2DMesh(foamCase: FoamCase):
     """
