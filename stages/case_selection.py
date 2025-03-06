@@ -7,7 +7,6 @@ from pathlib import Path
 from foamlib import FoamCase
 from state import *
 import shutil
-from stages.solver_settings import get_solver_state_from_case
 
 _FOAM_RUN = os.environ.get("FOAM_RUN")
 if not _FOAM_RUN:
@@ -17,7 +16,7 @@ if not ROOT_DIR.exists():
     raise FileNotFoundError(f"FOAM_RUN directory not found: {ROOT_DIR}")
 
 def main():
-    
+
     method = st.radio("Choose input method:", ["New", "Browse"])
 
     if method == "New":
@@ -61,7 +60,7 @@ def createNew(dest: Path) -> None:
     template_path = Path(os.environ.get("PMF_TEMPLATES", "")) / "base"
     if not template_path.exists():
         raise ValueError(f"Template directory not found: {template_path}")
-        
+
     try:
         FoamCase(template_path).copy(dest)
     except Exception as e:
