@@ -1,7 +1,6 @@
 import streamlit as st
 from stages.case_selection import main, load_state
 from state import *
-from stages.solver_settings import get_solver_state_from_case
 
 initialize_state()  # Call the initialization function
 
