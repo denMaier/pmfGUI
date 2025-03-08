@@ -88,7 +88,7 @@ class Function1(ABC):
         pass
 
     @abstractmethod
-    def render_ui(self, label: str, key_prefix: str) -> 'Function1':
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> 'Function1':
         """Render UI for this Function1 and return updated instance."""
         pass
 
@@ -121,8 +121,12 @@ class Function1(ABC):
         """Parse a Function1 from OpenFOAM syntax string."""
         return Function1Registry.parse_foam(foam_str)
 
-    def select_function_type(self, label: str, key_prefix: str) -> 'Function1':
+    def select_function_type(self, label: str, key_prefix: str, skip_selector: bool = False) -> 'Function1':
         """Render a selector for Function1 type and return the selected type."""
+        # If skip_selector is True, just return self
+        if skip_selector:
+            return self
+
         function1_options = Function1Registry.get_type_options()
 
         # Determine current function type
@@ -178,7 +182,7 @@ class GenericFunction1(Function1):
         """
         return self._impl.to_foam()
 
-    def render_ui(self, label: str, key_prefix: str) -> 'Function1':
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> 'Function1':
         """
         Render UI and allow user to select Function1 type.
 
@@ -190,7 +194,7 @@ class GenericFunction1(Function1):
             The selected Function1 implementation
         """
         # This will allow the user to select the Function1 type and return the appropriate concrete instance
-        return self._impl.select_function_type(label, key_prefix)
+        return self._impl.select_function_type(label, key_prefix, skip_selector)
 
 
 class Function1Factory:
@@ -225,10 +229,10 @@ class UniformFunction1(Function1):
         else:
             return f"uniform {self.value}"
 
-    def render_ui(self, label: str, key_prefix: str) -> Function1:
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
         """Render UI for this Function1 and return updated instance."""
         # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix)
+        new_fn = self.select_function_type(label, key_prefix, skip_selector)
         if new_fn is not self:
             return new_fn
 
@@ -277,10 +281,10 @@ tableFileCoeffs
     interpolationScheme {self.interpolation_scheme};
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str) -> Function1:
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
         """Render UI for this Function1 and return updated instance."""
         # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix)
+        new_fn = self.select_function_type(label, key_prefix, skip_selector)
         if new_fn is not self:
             return new_fn
 
@@ -333,10 +337,10 @@ class RampFunction1(Function1):
     duration {self.duration};
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str) -> Function1:
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
         """Render UI for this Function1 and return updated instance."""
         # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix)
+        new_fn = self.select_function_type(label, key_prefix, skip_selector)
         if new_fn is not self:
             return new_fn
 
@@ -394,10 +398,10 @@ csvFileCoeffs
     interpolationScheme linear;
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str) -> Function1:
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
         """Render UI for this Function1 and return updated instance."""
         # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix)
+        new_fn = self.select_function_type(label, key_prefix, skip_selector)
         if new_fn is not self:
             return new_fn
 
@@ -447,10 +451,10 @@ cosineCoeffs
     level {self.level};
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str) -> Function1:
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
         """Render UI for this Function1 and return updated instance."""
         # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix)
+        new_fn = self.select_function_type(label, key_prefix, skip_selector)
         if new_fn is not self:
             return new_fn
 
@@ -502,10 +506,10 @@ class CustomFunction1(Function1):
     def to_foam(self) -> str:
         return self.code
 
-    def render_ui(self, label: str, key_prefix: str) -> Function1:
+    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
         """Render UI for this Function1 and return updated instance."""
         # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix)
+        new_fn = self.select_function_type(label, key_prefix, skip_selector)
         if new_fn is not self:
             return new_fn
 

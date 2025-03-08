@@ -75,9 +75,12 @@ class BoundaryCondition:
                     if Function1Registry.detect_type(entry_value) != selected_type:
                         entry_value = Function1.create(selected_type, is_vector=entry_value.is_vector)
 
-                    # Render the UI without type selection
-                    updated_entries[entry_key] = entry_value.render_ui(
-                        entry_key, f"{field}_{boundary_name}_{entry_key}")
+                # Always render the UI for the Function1, but skip the type selector
+                # if we are using pre-selected types
+                updated_entries[entry_key] = entry_value.render_ui(
+                    entry_key,
+                    f"{field}_{boundary_name}_{entry_key}",
+                    skip_selector=use_f1_types_from_session)  # Skip selector if using from session
             elif isinstance(entry_value, (list, np.ndarray)) and len(entry_value) == 3:
                 # Render vector entries
                 cols = st.columns(3)
