@@ -10,19 +10,6 @@ def initialize_state():
         st.session_state.case_data = {}
         case_data = st.session_state.case_data
         case_data["Case"] = None  # Initialize Case
-        case_data["Paths"] = {
-            "cellZones": "constant/polyMesh/cellZones",
-            "boundary": "constant/polyMesh/boundary",
-            "physicsProperties": "constant/physicsProperties",
-            "solidProperties": "constant/solid/solidProperties",
-            "poroFluidProperties": "constant/poroFluid/poroFluidProperties",
-            "poroCouplingProperties": "constant/poroCouplingProperties",
-            "mechanicalProperties": "constant/solid/mechanicalProperties",
-            "poroHydraulicProperties": "constant/poroFluid/poroHydraulicProperties",
-            "dotFoam": None,
-            "blockMeshDict": None,
-            "g": "constant/g"
-        }
         case_data["Case Selection"] = {
                 "selected_case": None
         }
@@ -34,8 +21,7 @@ def initialize_state():
                     "boundaries": None, # Read with pyVista
                     "df_vertices": None, # For 2D Mesh generator
                     "df_edges": None, # For 2D Mesh generator
-                    "boundary": {}, # For 2D Mesh generator
-                    "edgeDict": None, # For 2D Mesh generator
+                    "edgeDict": {}, # For 2D Mesh generator
                     "cellSize": 0.1, # For cfMesh
                     "nBoundaryLayers": 0 # For cfMesh
         }
@@ -53,6 +39,20 @@ def initialize_state():
         vis["bg_darkness"] = 0.35
         vis["selected_palette"] = 'deep'
 
+PATHS = {
+"cellZones": "constant/polyMesh/cellZones",
+"boundary": "constant/polyMesh/boundary",
+"physicsProperties": "constant/physicsProperties",
+"solidProperties": "constant/solid/solidProperties",
+"poroFluidProperties": "constant/poroFluid/poroFluidProperties",
+"poroCouplingProperties": "constant/poroCouplingProperties",
+"mechanicalProperties": "constant/solid/mechanicalProperties",
+"poroHydraulicProperties": "constant/poroFluid/poroHydraulicProperties",
+"dotFoam": None,
+"blockMeshDict": None,
+"gSolid": "constant/solid/g",
+"gGroundwater": "constant/poroFluid/g"
+}
 
 SOLVER_OPTIONS = {
     "Mechanics": {
@@ -95,6 +95,17 @@ FIELD_REGIONS = {
     "sigmaEff":"solid"
 }
 
+FIELD_DEFAULT_VALUE = {
+    "p_rgh": "uniform 0",
+    "S": "uniform 0",
+    "k": "uniform 1e-4",
+    "n": "uniform 0.5",
+    "D": "uniform (0 0 0)",
+    "epsilon": "uniform (0 0 0 0 0 0)",
+    "sigma": "uniform (0 0 0 0 0 0)",
+    "sigmaEff":"uniform (0 0 0 0 0 0)"
+}
+
 BC_TYPES = {
     "p_rgh": [
         "fixedValue",
@@ -113,7 +124,7 @@ BC_TYPES = {
         "slip"
     ],
     "D": [
-        
+
     ]
 }
 #Access
@@ -126,22 +137,28 @@ def get_case_data():
     return st.session_state.case_data
 
 def get_selected_case_path():
-    return Path(st.session_state.case_data.get("Case"))
+    case = st.session_state.case_data.get("Case")
+    if case is not None:
+        return Path(case)
+    else:
+        return case
 
 def get_selected_case_name():
     return get_case_data().get("Case Selection").get("selected_case")
 
 def get_solver_type():
     selected = get_case_data()["Solver"].get("selected")
-    if selected == None:
-        selected = SOLVER_TYPE_MAP[get_file("physicsProperties")["type"]]
+    physicsProperties = get_file("physicsProperties")
+    if selected is None:
+        selected = SOLVER_TYPE_MAP[physicsProperties["type"]]
     return selected
 
 def is_unsaturated():
     solver = get_case_data()["Solver"].get("selected")
     if solver in ["Coupled","Groundwater"]:
-        if st.session_state.case_data["Solver"].get("unsaturated") == None:
-            unsat = (get_file("poroFluidProperties")["poroFluidModel"] == "varSatPoroFluid")
+        poroFluidProperties = get_file("poroFluidProperties")
+        if st.session_state.case_data["Solver"].get("unsaturated") is None and poroFluidProperties is not None:
+            unsat = (poroFluidProperties["poroFluidModel"] == "varSatPoroFluid")
             st.session_state.case_data["Solver"]["unsaturated"] = unsat
             return unsat
         else:
@@ -149,15 +166,15 @@ def is_unsaturated():
     return False
 
 def has_mesh():
-    return Path(st.session_state["Paths"]["boundary"]).exists()
+    return (Path(get_case()) / PATHS["boundary"]).exists()
 
 def get_cell_zones():
-    cellZones = st.session_state["Mesh"].get("cellZones")
+    cellZones = st.session_state.case_data["Mesh"].get("cellZones")
     if not cellZones and has_mesh():
         load_case_cell_zones()
-    return st.session_state["Mesh"].get("cellZones")
+    return st.session_state.case_data["Mesh"].get("cellZones")
 
-def get_file(filename: str) -> FoamFile | None:
+def get_file(filename: str) -> FoamFile:
     """
     Retrieves a FoamFile object for the specified filename from the active case.
 
@@ -175,35 +192,37 @@ def get_file(filename: str) -> FoamFile | None:
     if not case:
         raise RuntimeError("No active Foam case configured")
 
-    path_config = st.session_state.case_data["Paths"].get(filename)
+    path_config = PATHS.get(filename)
     if not path_config:
         raise ValueError(f"Path configuration missing for '{filename}'")
 
-    filepath = Path(path_config)
+    filepath = Path(get_case())/path_config
     if not filepath.exists():
         st.error(f"File not found: {filepath}")
-        return None
+        st.stop()
 
     try:
         return case.file(filepath)
     except Exception as e:
         st.error(f"Error accessing {filename}: {str(e)}")
-        return None
+        st.stop()
 
 # Setters and for selected_case
 
 def set_selected_case(case_name,case_dir):
     st.session_state.case_data["Case Selection"]["selected_case"] = case_name
-    st.session_state.case_data.Case = FoamCase(Path(case_dir))
+    st.session_state.case_data["Case"] = FoamCase(Path(case_dir))
 
 def set_solver_type(solver_type):
     st.session_state.case_data["Solver"]["selected"] = solver_type
-    with get_file("physicsProperties") as physicsProperties:
-        physicsProperties["type"] = SOLVER_OPTIONS[solver_type]["type"]
+    physicsProperties = get_file("physicsProperties")
+    if physicsProperties is not None:
+        with physicsProperties:
+            physicsProperties["type"] = SOLVER_OPTIONS[solver_type]["type"]
 
 def load_state(case_dir: Path) -> None:
     """Loads state from a file within the case directory, if available."""
-    state_file_path = case_dir / ".pmf_state.json"
+    state_file_path = Path(case_dir) / ".pmf_state.json"
     if not state_file_path.exists():
         st.info("No saved state file found. Starting with default state.")
         return
@@ -224,7 +243,7 @@ def load_state(case_dir: Path) -> None:
         st.error(f"Error decoding state file {state_file_path}. File may be corrupted.")
     except Exception as e:
         st.error(f"Error loading state from {state_file_path}: {str(e)}")
-    
+
 def clear_state(case_dir: Path) -> None:
     """Clears the state for a given case directory."""
     if "case_data" in st.session_state:
@@ -232,11 +251,11 @@ def clear_state(case_dir: Path) -> None:
         st.session_state.case_data = {} # Reset case_data
         initialize_state() # Re-initialize to default
         st.session_state.case_data["Case"] = FoamCase(case_dir)
-        st.session_state.case_data["Case Selection"]["selected_case"] = case_name 
+        st.session_state.case_data["Case Selection"]["selected_case"] = case_name
         st.success(f"Cleared state for case: {case_dir}")
     else:
         st.warning("No state to clear.")
-        
+
 def clear_stage_state(stage: str) -> None:
     """Clears the state for a given stage."""
     if stage in st.session_state.case_data:
@@ -247,8 +266,8 @@ def clear_stage_state(stage: str) -> None:
 
 def save_state(case_dir: Path) -> None:
     """Saves the current state to a file within the case directory."""
-    state_file_path = case_dir / ".pmf_state.json"
-    
+    state_file_path = Path(case_dir) / ".pmf_state.json"
+
     # Extract state to save (exclude FoamCase and file_mtimes)
     state_to_save = {
         key: value for key, value in st.session_state.case_data.items()
@@ -256,12 +275,12 @@ def save_state(case_dir: Path) -> None:
     }
 
     try:
-        with open(state_file_path, "w") as f:
+        with open(str(state_file_path), "w") as f:
             json.dump(state_to_save, f, indent=4)
         st.success(f"Saved state to: {state_file_path}")
     except Exception as e:
         st.error(f"Error saving state: {str(e)}")
-        
+
 def load_case_cell_zones():
     """
     Extracts cellZone names from an OpenFOAM cellZones file,
@@ -274,7 +293,7 @@ def load_case_cell_zones():
               cellZones are found or if an error occurs.
     """
 
-    filePath = Path(get_case_data()["Paths"]["cellZones"])
+    filePath = Path(PATHS["cellZones"])
 
     if not filePath.exists():
         st.warning("No CellZones exist! Please create at least one cellZone!")

@@ -5,6 +5,7 @@ from state import *
 from stages.meshAux.helpers import *
 from stages.meshAux.make2D import *
 
+@st.fragment
 def main3D():
     foamCase = get_case()
 
@@ -21,6 +22,7 @@ def main3D():
     )
     #set_boundary_types()
 
+@st.fragment
 def main2D():
     foamCase = get_case()
 
@@ -112,26 +114,31 @@ def make2DMesh(foamCase: FoamCase):
     handling variations in whitespace, line breaks, and the FoamFile header.
     """
     meshDict = foamCase.file("system/meshDict")
+
     if not Path(meshDict).exists():
         st.error("There is no meshDict file")
         return
 
+    meshData = get_case_data()["Mesh"]
+    edgeDict = meshData["edgeDict"]
+    if Path(get_case().file("system/edgeDict")).exists():
+        meshData["edgeDict"] = get_case().file("system/edgeDict").as_dict()
+
     if st.button("Generate Geometry"):
         twoDEdgeDictGenerator()
-    meshData = get_case_data()["Mesh"]
-    if meshData["edgeDict"] is not None:
-        meshData["cellSize"] = st.number_input("maxCellSize", value=meshData["cellSize"])
-        meshData["nBoundaryLayers"] = st.number_input("nBoundaryLayers", value=meshData["nBoundaryLayers"])
-        if st.button("Start Meshing"):
-            fmsRibbon = edgesToRibbonFMS(meshData["edgeDict"])
-            with open(Path(foamCase)/"system/geometryRibbon.fms", 'w') as f:
-                f.write(fmsRibbon)
-                print("Wrote the file")
-            meshDict["surfaceFile"] = '"system/geometryRibbon.fms"'
-            meshDict["maxCellSize"] = meshData["cellSize"]
-            meshDict["boundaryLayers"]["nLayers"] = meshData["nBoundaryLayers"]
-            try:
-                foamCase.run(["cartesian2DMesh"])
-                st.success("Mesh created successfully")
-            except Exception as e:
-                st.error(f"Failed to create mesh: {e}")
+    if edgeDict:
+        with st.form("Meshing2D"):
+            meshData["cellSize"] = st.number_input("maxCellSize", value=meshData["cellSize"])
+            meshData["nBoundaryLayers"] = st.number_input("nBoundaryLayers", value=meshData["nBoundaryLayers"])
+            if st.form_submit_button("Start Meshing"):
+                fmsRibbon = edgesToRibbonFMS(get_case().file("system/edgeDict").as_dict())
+                with open(Path(foamCase)/"system/geometryRibbon.fms", 'w') as f:
+                    f.write(fmsRibbon)
+                meshDict["surfaceFile"] = '"system/geometryRibbon.fms"'
+                meshDict["maxCellSize"] = meshData["cellSize"]
+                meshDict["boundaryLayers"]["nLayers"] = meshData["nBoundaryLayers"]
+                try:
+                    foamCase.run(["cartesian2DMesh"])
+                    st.success("Mesh created successfully")
+                except Exception as e:
+                    st.error(f"Failed to create mesh: {e}")

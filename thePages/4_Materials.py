@@ -1,3 +1,4 @@
+from altair.utils.plugin_registry import R
 import streamlit as st
 from stages.mechanical import main_mechanical
 from stages.hydraulics import main_hydraulic
@@ -34,7 +35,7 @@ else:
             with col1:
                 main_mechanical(foamCase)
             with col2:
-                with get_file('mechanicalProperties').open() as f:
+                with open(get_file('mechanicalProperties'),'r') as f:
                     with st.expander("Current mechanicalProperties"):
                         st.code(f.read(),language="cpp")
 
@@ -45,6 +46,6 @@ else:
             with col1:
                 main_hydraulic(foamCase)
             with col2:
-                with get_file('poroHydraulicProperties').open() as f:
+                with open(get_file('poroHydraulicProperties'),'r') as f:
                     with st.expander("Current poroHydraulicProperties"):
                         st.code(f.read(),language="cpp")

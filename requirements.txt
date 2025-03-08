@@ -1,6 +1,7 @@
 streamlit
 foamlib
-matplotlib
-numpy
 pathlib
 stpyvista
+st-annotated-text
+seaborn
+scipy

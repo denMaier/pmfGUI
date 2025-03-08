@@ -4,18 +4,23 @@ import altair as alt
 import json
 
 from vtkmodules.vtkCommonDataModel import vtkVertex
-from state import get_case, get_case_data
+from state import *
 
 @st.dialog("2D Mesh Generator", width="large")
 def twoDEdgeDictGenerator():
     mesh_data = get_case_data()["Mesh"]
+    case = get_case()
+    edgeDict = mesh_data["edgeDict"]
 
     # --- Vertex Input ---
     with st.form("vertices_form"):
         st.header("1. Define Vertices")
         st.write("Enter the x and y coordinates for each vertex.")
 
-        if mesh_data['df_vertices'] is None:
+        if 'vertices' in edgeDict and mesh_data['df_vertices'] is None:
+            data =  edgeDict["vertices"]
+            mesh_data['df_vertices'] = pd.DataFrame(data, columns=['x', 'y'])
+        elif mesh_data['df_vertices'] is None:
             data = {'x': [0.0], 'y': [0.0]}
             mesh_data['df_vertices'] = pd.DataFrame(data)
 
@@ -35,6 +40,10 @@ def twoDEdgeDictGenerator():
             mesh_data['df_vertices'] = edited_df_vertices
 
         with col2:
+            if st.form_submit_button("Submit Vertices"):
+                edgeDict['vertices'] = edited_df_vertices[['x', 'y']].values.tolist()
+                st.success("Vertices submitted!")
+
             if not mesh_data['df_vertices'].empty:
                 plot_df = mesh_data['df_vertices'].copy()
                 plot_df['index'] = plot_df.index
@@ -44,17 +53,16 @@ def twoDEdgeDictGenerator():
             else:
                 st.write("Enter vertex data to see the plot.")
 
-        if st.form_submit_button("Submit Vertices"):
-            mesh_data['vertices'] = edited_df_vertices[['x', 'y']].values.tolist()
-            st.success("Vertices submitted!")
-
     # --- Edge Input ---
-    if 'vertices' in mesh_data:
+    if 'vertices' in edgeDict:
         with st.form("edges_form"):
             st.header("2. Define Edges")
             st.write("Enter the vertex indices that define each edge.")
 
-            if mesh_data['df_edges'] is None:
+            if 'edges' in edgeDict and mesh_data['df_edges'] is None:
+                edges_data = edgeDict["edges"]
+                mesh_data['df_edges'] = pd.DataFrame(edges_data, columns=['P1', 'P2'])
+            elif mesh_data['df_edges'] is None:
                 edges_data = {'P1': [0], 'P2': [1]}
                 mesh_data['df_edges'] = pd.DataFrame(edges_data)
 
@@ -78,10 +86,10 @@ def twoDEdgeDictGenerator():
 
             with col2:
                 if st.form_submit_button("Submit Edges"):
-                    mesh_data['edges'] = edited_df_edges[['P1', 'P2']].to_numpy(dtype=int).tolist()
+                    edgeDict['edges'] = edited_df_edges[['P1', 'P2']].to_numpy(dtype=int).tolist()
                     st.success("Edges submitted!")
 
-                if 'edges' in mesh_data and mesh_data['edges']:  # Check for existence AND non-empty
+                if not mesh_data['df_vertices'].empty and edgeDict['edges']:  # Check for existence AND non-empty
                     # --- Altair Plotting (Vertices and Edges) ---
                     plot_df = mesh_data['df_vertices'].copy()
                     plot_df['index'] = plot_df.index
@@ -94,11 +102,11 @@ def twoDEdgeDictGenerator():
 
                     # 3. Edge Lines (using a separate DataFrame)
                     edges_list = []
-                    for edge in mesh_data['edges']:
+                    for edge in edgeDict['edges']:
                         try:
-                            x1, y1 = mesh_data['vertices'][edge[0]]
-                            x2, y2 = mesh_data['vertices'][edge[1]]
-                            edges_list.append({'x': x1, 'y': y1, 'x2': x2, 'y2': y2, 'edge_id': f"{edge[0]}-{edge[1]}"}) #create a unique id
+                            x1, y1 = tuple(edgeDict['vertices'][edge[0]])
+                            x2, y2 = tuple(edgeDict['vertices'][edge[1]])
+                            edges_list.append({'x': x1, 'y': y1, 'x2': x2, 'y2': y2, 'edge_id': f"{edge}"}) #create a unique id
                         except IndexError:
                             st.warning("Invalid edge index. Please check your edge definitions.")
                             #Crucially, don't break here.  Continue processing other edges.
@@ -118,19 +126,19 @@ def twoDEdgeDictGenerator():
                     else:
                         st.altair_chart(points+text, use_container_width=True) #show the vertices in case no edges can be drawn
 
-                elif 'edges' in mesh_data and not mesh_data['edges']:
+                elif 'edges' in edgeDict and not edgeDict['edges']:
                     st.write("No edges defined.") #Specific message if no edges were entered
                 else:
                      st.write("Submit Edges to display the plot.")
 
     # 3. Input: Boundary Patches
-    if 'edges' in mesh_data:
+    if 'vertices' in edgeDict and 'edges' in edgeDict:
         with st.container(border=True):
             st.header("3. Define Boundary Patches")
             st.write("Define the boundary patches, their types, and the edges associated with them.")
 
-            if mesh_data['boundary']:
-                defaultNames = list(mesh_data['boundary'].keys())
+            if 'boundary' in edgeDict and edgeDict['boundary']:
+                defaultNames = list(edgeDict['boundary'].keys())
                 default_num = len(defaultNames)
             else:
                 default_num = 1
@@ -145,22 +153,22 @@ def twoDEdgeDictGenerator():
                     if i < len(defaultNames):
                         defaultName = defaultNames[i]
                         defaultEdges = []
-                        for edgeindex in mesh_data['boundary'][defaultName]['edges']:
-                            defaultEdges.append(mesh_data['edges'][edgeindex])
-                        defaultPatchType =  mesh_data['boundary'][defaultName]['type']
+                        for edgeindex in edgeDict['boundary'][defaultName]['edges']:
+                            defaultEdges.append(edgeDict['edges'][edgeindex])
+                        defaultPatchType =  edgeDict['boundary'][defaultName]['type']
                     else:
-                        defaultName = f"Patch {i+1}"
+                        defaultName = f"Patch{i+1}"
                         defaultEdges = []
                         defaultPatchType = []
 
                     patch_name = st.text_input(f"Patch Name:", value=defaultName, key=f"name_{i}")
-                    patch_type = st.segmented_control(f"Patch Type:", options=['patch', 'wall', 'symmetry', 'empty'], default=defaultPatchType, key=f"type_{i}")
+                    patch_type = st.segmented_control(f"Patch Type:", options=['patch', 'symmetryPlane', 'empty', 'cyclic'], default=defaultPatchType, key=f"type_{i}")
 
-                    edge_names = st.pills(f"Edge Indices for Patch {i+1}", mesh_data['edges'], selection_mode="multi", default=defaultEdges, key=f"edge_{i}")
+                    edge_names = st.pills(f"Edge Indices for Patch {i+1}", edgeDict['edges'], selection_mode="multi", default=defaultEdges, key=f"edge_{i}")
 
                     edge_indices = []
                     for edge_name in edge_names:
-                        edge_indices.append(mesh_data['edges'].index(edge_name))
+                        edge_indices.append(edgeDict['edges'].index(edge_name))
 
                     patches[patch_name] = {
                         'type': patch_type,
@@ -168,24 +176,28 @@ def twoDEdgeDictGenerator():
                     }
 
                 if st.form_submit_button("Submit Boundary Patches"):
-                    mesh_data['boundary'] = patches
+                    edgeDict['boundary'] = {}
+                    edgeDict['boundary'] = patches
 
 
     # 4. Generate the Dictionary
-    if 'vertices' in mesh_data and 'edges' in mesh_data and 'boundary' in mesh_data:
+    if 'vertices' in edgeDict and 'edges' in edgeDict and 'boundary' in edgeDict:
         st.header("4. Generated Dictionary")
-
-        input_dict = {
-            'vertices': mesh_data['vertices'],
-            'edges': mesh_data['edges'],
-            'boundary': mesh_data['boundary']
-        }
+        if st.button("Write Dict"):
+            edgeDictFile = case.file("system/edgeDict")
+            if not Path(edgeDictFile).exists():
+                Path(edgeDictFile).touch()
+            with edgeDictFile:
+                for key, value in edgeDict.items():
+                    if isinstance(value, dict):
+                        edgeDictFile[key] = {}
+                edgeDictFile.update(edgeDict)
+            st.rerun()
 
         with st.expander("Here is the generated dictionary:"):
-            st.json(input_dict)
-        if st.button("Create Mesh"):
-            mesh_data["edgeDict"] = input_dict
-            st.rerun()
+            st.json(edgeDict)
+
+
 
 
 @st.cache_data

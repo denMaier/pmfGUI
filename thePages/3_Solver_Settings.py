@@ -1,5 +1,5 @@
 import streamlit as st
-from stages.solver_settings import main, get_solver_state_from_case
+from stages.solver_settings import main
 from state import *
 import os
 

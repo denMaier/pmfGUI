@@ -14,18 +14,20 @@ def show_settings(file: FoamFile):
         st.code(f.open(),language="cpp")
 
 def main():
-    with get_file("physicsProperties") as physicsProperties:
-        
+    current_solver_type = get_solver_type()
+    if current_solver_type is not None:
+
+        current_solver_index = list(SOLVER_OPTIONS.keys()).index(current_solver_type)
         selected_solver = st.selectbox("Select Solver:", list(SOLVER_OPTIONS.keys()),
-                                    index=list(SOLVER_OPTIONS.keys()).index(get_solver_type()))
-        
+                                    index=current_solver_index)
+
         if st.button("Select Solver"):
             set_solver_type(selected_solver)
             save_state(Path(get_selected_case_path()))
             st.rerun()
-            
-    st.subheader("Selected: " + get_solver_type())
-    set_solver_type_settings()
+
+        st.subheader(f"Selected: {get_solver_type()}")
+        set_solver_type_settings()
 
 @st.fragment
 def set_solver_type_settings():
@@ -53,7 +55,7 @@ def set_solver_type_settings():
                     field,min_value=0.0,
                     max_value=1.2,
                     step=0.01,
-                    value=fvSolutionDict["relaxationFactors"].as_dict()[field]
+                    value=fvSolutionDict["relaxationFactors"][field]
                     )
         with (
             tabs[1] # fvSchemesDict
@@ -73,27 +75,35 @@ def set_solver_type_settings():
                 solid_dict = solidDict["linearGeometryTotalDisplacementCoeffs"]
                 for key, value in solid_dict.items():
                     new_value = render_input_element(key,value)
-                    solidProperties["linearGeometryTotalDisplacementCoeffs"][key] = new_value
+                    solidDict["linearGeometryTotalDisplacementCoeffs"][key] = new_value
 
         if selected_solver in ["Groundwater","Coupled"]:
             with (
                 tabs[tabNames.index("Hydraulics")]
             ):
                 fluidModelFromDict = poroFluidDict["poroFluidModel"]
-                fluidmodel = st.selectbox("Model",list(POROFLUIDMODEL_TYPES.keys()),index=list(POROFLUIDMODEL_TYPES.values()).index(fluidModelFromDict))
+                fluidModelIndex = list(POROFLUIDMODEL_TYPES.values()).index(str(fluidModelFromDict))
+                fluidmodel = st.selectbox("Model",list(POROFLUIDMODEL_TYPES.keys()),index=fluidModelIndex)
                 fluidmodel = POROFLUIDMODEL_TYPES[fluidmodel]
                 poroFluidDict["poroFluidModel"] = fluidmodel
                 coeffsDict = poroFluidDict[f"{fluidmodel}Coeffs"]
-                poroFluidDict[f"{fluidmodel}Coeffs"]["iterations"] = st.number_input("iterations",0, value=coeffsDict["iterations"], step=1)
-                algo_options = ["standard","Casulli","LScheme","Celia"]
+                current_iterations = int(coeffsDict["iterations"])
+                poroFluidDict[f"{fluidmodel}Coeffs"]["iterations"] = st.number_input(
+                    "iterations",
+                    value=current_iterations,
+                    min_value=1,
+                    step=1
+                )
                 if fluidmodel=="varSatPoroFluid":
+                    algo_options = ["standard","Casulli","LScheme","Celia"]
+                    algo_index = algo_options.index(coeffsDict["solutionAlgorithm"])
                     poroFluidDict[fluidmodel+"Coeffs"]["solutionAlgorithm"] = st.selectbox(
                         "Algorithm",
                         algo_options,
-                        index=algo_options.index(coeffsDict["solutionAlgorithm"])
-                        )
+                        index=algo_index
+                    )
                 st.write("Convergence Criteria")
-                convergence = makeConvergence(coeffsDict["convergence"].as_dict())
+                convergence = makeConvergence(coeffsDict["convergence"])
                 poroFluidDict[f"{fluidmodel}Coeffs"]["convergence"] = {}
                 for key, value in convergence.items():
                     new_value = str(value[0])+" "+str(value[1])
@@ -106,15 +116,21 @@ def set_solver_type_settings():
                 poroSolidInterface = "poroSolid" if poroFluidDict["poroFluidModel"] == "poroFluid" else "varSatPoroSolid"
                 poroCouplingDict["poroSolidInterface"] = poroSolidInterface
                 coeffsDict = poroCouplingDict[f"{poroSolidInterface}Coeffs"]
-                poroCouplingDict[f"{poroSolidInterface}Coeffs"]["iterations"] = st.number_input("iterations",0, value=coeffsDict["iterations"], step=1)
+                current_iterations = int(coeffsDict["iterations"])
+                poroCouplingDict[f"{poroSolidInterface}Coeffs"]["iterations"] = st.number_input(
+                    "iterations",
+                    value=current_iterations,
+                    min_value=1,
+                    step=1
+                )
                 st.write("Convergence Criteria")
-                convergence = makeConvergence(coeffsDict["convergence"].as_dict())
+                convergence = makeConvergence(coeffsDict["convergence"])
                 for key, value in convergence.items():
                     new_value = str(value[0])+" "+str(value[1])
                     poroCouplingDict[f"{poroSolidInterface}Coeffs"]["convergence"][key] = new_value
 
         if st.form_submit_button("Save Solver Settings"):
-            
+
             with(
                 get_case().fv_schemes as fvSchemes,
                 get_case().fv_schemes as fvSolution,
@@ -127,8 +143,8 @@ def set_solver_type_settings():
                 poroCouplingProperties.update(poroCouplingDict)
                 poroFluidProperties.update(poroFluidDict)
                 solidProperties.update(solidDict)
-            
-            save_state(get_selected_case_path())   
+
+            save_state(get_selected_case_path())
             st.success("Solver settings saved.")
 
 

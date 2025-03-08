@@ -5,6 +5,7 @@ from foamlib import FoamCase
 from models.hydraulic_laws import  HYDRAULIC_LAWS
 from state import *
 
+@st.fragment
 def main_hydraulic(foamCase: FoamCase):
     """Handle the Materials stage of the workflow"""
     cell_zones = get_cell_zones()
@@ -22,13 +23,13 @@ def main_hydraulic(foamCase: FoamCase):
                 law_defaults["SWCC"] = "saturated"
 
             newZones = []
-            
+
             for law_type in list(law_defaults.keys()):
                 for tab, zone_name in zip(tabs, cell_zones):
                     with tab:
 
                         poroHydraulicDict = get_file('poroHydraulicProperties').as_dict
-                        
+
                         if zone_name not in poroHydraulicDict:
                             newZones.append(zone_name)
                             poroHydraulicDict[zone_name]={}
@@ -87,7 +88,7 @@ def main_hydraulic(foamCase: FoamCase):
                             zone_data[f"{law}Coeffs"][param_name] = value
 
 
-            
+
                         if st.form_submit_button("Save Hydraulic Properties"):
                             with get_file('poroHydraulicProperties') as poroHydraulicProperties:
                                 for zone in cell_zones.keys():

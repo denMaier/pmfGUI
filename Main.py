@@ -47,7 +47,7 @@ with case_details:
         if has_mesh():
             col1.write("Mesh:")
             col2.write("loaded")
-            if get_solver_type is not None:
+            if get_solver_type() is not None:
                 col1.write("Solver:")
                 col2.write(get_solver_type())
                 if get_solver_type() in ["Groundwater", "Coupled"] and get_case_data()["Solver"]["unsaturated"]:

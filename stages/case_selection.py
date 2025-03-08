@@ -46,9 +46,9 @@ def main():
     if get_selected_case_path() is not None:
         case_dir = get_selected_case_path()
         case_data = get_case_data()
-        case_data["Paths"]["dotFoam"] = case_dir/f"{get_selected_case_name()}.foam"
+        PATHS["dotFoam"] = case_dir/f"{get_selected_case_name()}.foam"
         dotFoam = get_file("dotFoam")
-        if not dotFoam.exists():
+        if not Path(dotFoam).exists():
            dotFoam.touch()
     else:
         st.info("No case directory selected yet.")
