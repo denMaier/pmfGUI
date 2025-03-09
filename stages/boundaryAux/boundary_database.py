@@ -47,14 +47,14 @@ class BoundaryCondition:
                 continue
 
             # Handle Function1 strings
-            if isinstance(value, str) and ("uniform" in value or any(ft in value for ft in ["tableFile", "linearRamp", "cosine"])):
-                bc.entries[key] = Function1.from_foam(value)
+            if isinstance(value, str) and ("uniform" in value or any(ft in value for ft in Function1Registry.get_all_types())):
+                bc.entries[key] = Function1.from_foam(value, selectable = True)
             else:
                 bc.entries[key] = value
 
         return bc
 
-    def render_ui(self, entry: str, boundary_name: str, use_f1_types_from_session: bool = False) -> 'BoundaryCondition':
+    def render_ui(self, entry: str, boundary_name: str) -> 'BoundaryCondition':
         """Render UI for this boundary condition and return updated instance."""
         st.subheader(f"{self.type} Boundary Condition")
 
@@ -65,22 +65,9 @@ class BoundaryCondition:
 
         for entry_key, entry_value in self.entries.items():
             if isinstance(entry_value, Function1):
-                f1_key = f"{field}_{boundary_name}_{entry_key}_f1_type"
-
-                if use_f1_types_from_session and 'function1_selections' in st.session_state and f1_key in st.session_state['function1_selections']:
-                    # Use the pre-selected Function1 type from session state
-                    selected_type = st.session_state['function1_selections'][f1_key]
-
-                    # Create the appropriate Function1 instance if needed
-                    if Function1Registry.detect_type(entry_value) != selected_type:
-                        entry_value = Function1.create(selected_type, is_vector=entry_value.is_vector)
-
-                # Always render the UI for the Function1, but skip the type selector
-                # if we are using pre-selected types
                 updated_entries[entry_key] = entry_value.render_ui(
                     entry_key,
-                    f"{field}_{boundary_name}_{entry_key}",
-                    skip_selector=use_f1_types_from_session)  # Skip selector if using from session
+                    f"{field}_{boundary_name}_{entry_key}")  # Skip selector if using from session
             elif isinstance(entry_value, (list, np.ndarray)) and len(entry_value) == 3:
                 # Render vector entries
                 cols = st.columns(3)
@@ -152,7 +139,7 @@ BOUNDARY_CONDITION_TEMPLATES = {
     "U": {
         "fixedValue": BoundaryCondition(
             type="uniformFixedValue",
-            entries={"value": Function1Factory.create_generic(is_vector=True)},
+            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True)},
             description=""
         ),
         "zeroGradient": BoundaryCondition(
@@ -163,26 +150,26 @@ BOUNDARY_CONDITION_TEMPLATES = {
     "D": {
         "fixedValue": BoundaryCondition(
             type="uniformFixedValue",
-            entries={"value": Function1Factory.create_generic(is_vector=True)},
+            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True)},
             description=""
         ),
         "fixedDisplacement": BoundaryCondition(
             type="fixedDisplacement",
-            entries={"value": UniformFunction1(value=[0, 0, 0], is_vector=True)},
+            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)},
             description=""
         ),
         "fixedDisplacementZeroShear": BoundaryCondition(
             type="fixedDisplacementZeroShear",
-            entries={"value": UniformFunction1(value=[0, 0, 0], is_vector=True)},
+            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)},
             description="Fixed displacement with zero shear stress"
         ),
         "traction": BoundaryCondition(
             type="poroTraction",
             entries={
                 "total": True,
-                "traction": Function1Factory.create_generic(is_vector=True),
-                "pressure": Function1Factory.create_generic(is_vector=False),
-                "value": UniformFunction1(value=[0, 0, 0], is_vector=True)
+                "traction": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True),
+                "pressure": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
+                "value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)
             },
             description="traction boundary for fully saturated conditions"
         ),
@@ -191,9 +178,9 @@ BOUNDARY_CONDITION_TEMPLATES = {
             entries={
                 "total": True,
                 "effectiveStressModel": "suctionCutOff",
-                "traction": Function1Factory.create_generic(is_vector=True),
-                "pressure": Function1Factory.create_generic(is_vector=False),
-                "value": UniformFunction1(value=[0, 0, 0], is_vector=True)
+                "traction": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True),
+                "pressure": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
+                "value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)
             },
             description="Variable saturation traction boundary"
         )
@@ -201,7 +188,7 @@ BOUNDARY_CONDITION_TEMPLATES = {
     "p": {
         "fixedValue": BoundaryCondition(
             type="uniformFixedValue",
-            entries={"value": Function1Factory.create_generic(is_vector=False)},
+            entries={"value": UniformFunction1(value=0.0, _is_vector=False, _selectable=True)},
             description=""
         ),
         "zeroGradient": BoundaryCondition(
@@ -212,40 +199,40 @@ BOUNDARY_CONDITION_TEMPLATES = {
     "p_rgh": {
         "fixedValue": BoundaryCondition(
             type="uniformFixedValue",
-            entries={"value": Function1Factory.create_generic(is_vector=False)},
+            entries={"value": UniformFunction1(value=0.0, _is_vector=False, _selectable=True)},
             description=""
         ),
         "fixedPotential": BoundaryCondition(
             type="fixedPotential",
             entries={
-                "h0": Function1Factory.create_generic(is_vector=False),
-                "value": UniformFunction1(value=0, is_vector=False)
+                "h0": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
+                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
             },
             description="Fixed hydraulic potential h[m]"
         ),
         "fixedFlux": BoundaryCondition(
             type="fixedPoroFlux",
             entries={
-                "flux": Function1Factory.create_generic(is_vector=False),
-                "value": UniformFunction1(value=0, is_vector=False)
+                "flux": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
+                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
             },
             description="Fixed volume flux q[m/s]"
         ),
         "seepageOutlet": BoundaryCondition(
             type="seepageOutlet",
             entries={
-                "outletValue": UniformFunction1(value=0, is_vector=False),
-                "h0": Function1Factory.create_generic(is_vector=False),
-                "value": UniformFunction1(value=0, is_vector=False)
+                "outletValue": UniformFunction1(value=0.0, _is_vector=False, _selectable=False),
+                "h0": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
+                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
             },
             description="Variable pressure/flow depending on groundwater level"
         ),
         "limitedHeadInfiltration": BoundaryCondition(
             type="limitedHeadInfiltration",
             entries={
-                "flux": Function1Factory.create_generic(is_vector=False),
-                "pMax": UniformFunction1(value=0, is_vector=False),
-                "value": UniformFunction1(value=0, is_vector=False)
+                "flux": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
+                "pMax": UniformFunction1(value=0.0, _is_vector=False, _selectable=False),
+                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
             },
             description="Variable pressure/flow depending on pressure level"
         )

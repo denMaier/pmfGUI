@@ -2,6 +2,7 @@
 Classes for representing OpenFOAM boundary conditions with an abstract Function1 base class
 and registration pattern to easily add new implementations.
 """
+from tkinter.constants import SEL
 from typing import Dict, List, Union, Optional, Any, Type, Callable
 from dataclasses import dataclass, field
 import numpy as np
@@ -66,17 +67,23 @@ class Function1Registry:
         return "custom"  # Default fallback
 
     @classmethod
-    def parse_foam(cls, foam_str: str) -> 'Function1':
+    def parse_foam(cls, foam_str: str, selectable: bool = True) -> 'Function1':
         """Parse a Function1 from OpenFOAM syntax string."""
         # Try each parser in order
         for function_type, parser in cls._parsers.items():
             try:
-                return parser(foam_str)
+                # Call parser with only the foam string
+                result = parser(foam_str)
+                if result is not None:
+                    # Set selectable on the result if it has the attribute
+                    if hasattr(result, '_selectable'):
+                        result._selectable = selectable
+                    return result
             except (ValueError, AttributeError):
                 continue
 
         # If no parser succeeds, use custom
-        return CustomFunction1(code=foam_str)
+        return CustomFunction1(code=foam_str, _selectable=selectable)
 
 
 class Function1(ABC):
@@ -88,7 +95,7 @@ class Function1(ABC):
         pass
 
     @abstractmethod
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> 'Function1':
+    def render_ui(self, label: str, key_prefix: str) -> 'Function1':
         """Render UI for this Function1 and return updated instance."""
         pass
 
@@ -98,34 +105,37 @@ class Function1(ABC):
         """Whether this function returns vector values."""
         pass
 
+    @property
+    @abstractmethod
+    def selectable(self) -> bool:
+        """Whether this function is selectable."""
+        pass
+
     @staticmethod
-    def create(function_type: str, is_vector: bool = False, **kwargs) -> 'Function1':
+    def create(function_type: str, is_vector: bool = False, selectable: bool = True, **kwargs) -> 'Function1':
         """Factory method to create the appropriate Function1 subclass."""
         if function_type == "generic":
-            return GenericFunction1(is_vector=is_vector)
+            return GenericFunction1(is_vector=is_vector, selectable=selectable)
 
         try:
             creator_class = Function1Registry.get_creator(function_type)
             # Add is_vector to kwargs if the implementation needs it
-            if hasattr(creator_class, "is_vector"):
-                kwargs["is_vector"] = is_vector
+            kwargs["_is_vector"] = is_vector
+            kwargs["_selectable"] = selectable
             return creator_class(**kwargs)
         except (ValueError, TypeError) as e:
             print(f"Error creating Function1 of type {function_type}: {e}")
             # Default to custom if creation fails
             code = kwargs.get("code", "// Custom Function1")
-            return CustomFunction1(code=code)
+            return CustomFunction1(code=code, _is_vector=is_vector, _selectable=selectable)
 
     @staticmethod
-    def from_foam(foam_str: str) -> 'Function1':
+    def from_foam(foam_str: str, selectable: bool = True) -> 'Function1':
         """Parse a Function1 from OpenFOAM syntax string."""
-        return Function1Registry.parse_foam(foam_str)
+        return Function1Registry.parse_foam(foam_str, selectable)
 
-    def select_function_type(self, label: str, key_prefix: str, skip_selector: bool = False) -> 'Function1':
+    def select_function_type(self, label: str, key_prefix: str) -> 'Function1':
         """Render a selector for Function1 type and return the selected type."""
-        # If skip_selector is True, just return self
-        if skip_selector:
-            return self
 
         function1_options = Function1Registry.get_type_options()
 
@@ -146,79 +156,22 @@ class Function1(ABC):
             return self
 
         # Create a new instance with default values
-        return Function1.create(selected_type, is_vector=self.is_vector)
-
-
-class GenericFunction1(Function1):
-    """
-    A Function1 that doesn't commit to a specific implementation until render_ui is called.
-    Acts as a placeholder that will be replaced with a concrete Function1 implementation.
-    """
-
-    def __init__(self, is_vector: bool = False):
-        """
-        Initialize with vector flag.
-
-        Args:
-            is_vector: Whether this function will return vector values
-        """
-        self._is_vector = is_vector
-        # Default to uniform with appropriate value type
-        self._impl = UniformFunction1(
-            value=[0, 0, 0] if is_vector else 0.0,
-            is_vector=is_vector
-        )
-
-    @property
-    def is_vector(self) -> bool:
-        return self._is_vector
-
-    def to_foam(self) -> str:
-        """
-        Delegate to the concrete implementation.
-
-        Returns:
-            OpenFOAM syntax string
-        """
-        return self._impl.to_foam()
-
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> 'Function1':
-        """
-        Render UI and allow user to select Function1 type.
-
-        Args:
-            label: Label for the UI
-            key_prefix: Unique prefix for UI components
-
-        Returns:
-            The selected Function1 implementation
-        """
-        # This will allow the user to select the Function1 type and return the appropriate concrete instance
-        return self._impl.select_function_type(label, key_prefix, skip_selector)
-
-
-class Function1Factory:
-    """Factory class that creates appropriate Function1 instances on demand."""
-
-    @staticmethod
-    def create_generic(is_vector: bool = False) -> Function1:
-        """
-        Create a generic Function1 that will prompt for type selection when render_ui is called.
-
-        Args:
-            is_vector: Whether this function will return vector values
-
-        Returns:
-            A GenericFunction1 instance that delegates to specific implementations
-        """
-        return GenericFunction1(is_vector=is_vector)
-
+        return Function1.create(selected_type, is_vector=self.is_vector,  selectable=self.selectable)
 
 @dataclass
 class UniformFunction1(Function1):
     """Uniform (constant) value Function1."""
     value: Union[float, List[float]] = 0.0
-    is_vector: bool = False
+    _is_vector: bool = False
+    _selectable: bool = True
+
+    @property
+    def is_vector(self) -> bool:
+        return self._is_vector
+
+    @property
+    def selectable(self) -> bool:
+        return self._selectable
 
     def to_foam(self) -> str:
         if self.is_vector:
@@ -229,12 +182,33 @@ class UniformFunction1(Function1):
         else:
             return f"uniform {self.value}"
 
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
+    @staticmethod
+    def parse(foam_str: str) -> Function1:
+        # Check if it's a vector or scalar
+        vector_match = re.search(r'uniform\s+\(([^)]+)\)', foam_str)
+        if vector_match:
+            # It's a vector value
+            values_str = vector_match.group(1)
+            try:
+                values = [float(val) for val in values_str.split()]
+                if len(values) >= 3:
+                    return UniformFunction1(value=values[:3], _is_vector=True)
+            except ValueError:
+                return CustomFunction1(code="", _is_vector=True)
+        else:
+            # It's a scalar value
+            scalar_match = re.search(r'uniform\s+([0-9.e+-]+)', foam_str)
+            if scalar_match:
+                try:
+                    value = float(scalar_match.group(1))
+                    return UniformFunction1(value=value, _is_vector=False)
+                except ValueError:
+                    return CustomFunction1(code="", _is_vector=False)
+
+        return UniformFunction1(value=0.0, _is_vector=False)
+
+    def render_ui(self, label: str, key_prefix: str) -> Function1:
         """Render UI for this Function1 and return updated instance."""
-        # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix, skip_selector)
-        if new_fn is not self:
-            return new_fn
 
         # Render uniform-specific UI
         if self.is_vector:
@@ -246,17 +220,17 @@ class UniformFunction1(Function1):
 
             cols = st.columns(3)
             with cols[0]:
-                x = st.number_input("X", value=float(default_vals[0]), key=f"{key_prefix}_x")
+                x = st.number_input(f"{label}_X", value=float(default_vals[0]), key=f"{key_prefix}_x")
             with cols[1]:
-                y = st.number_input("Y", value=float(default_vals[1]), key=f"{key_prefix}_y")
+                y = st.number_input(f"{label}_Y", value=float(default_vals[1]), key=f"{key_prefix}_y")
             with cols[2]:
-                z = st.number_input("Z", value=float(default_vals[2]), key=f"{key_prefix}_z")
+                z = st.number_input(f"{label}_Z", value=float(default_vals[2]), key=f"{key_prefix}_z")
 
-            return UniformFunction1(value=[x, y, z], is_vector=True)
+            return UniformFunction1(value=[x, y, z], _is_vector=True, _selectable=self.selectable)
         else:
             # For scalar fields, provide a single input
             value = st.number_input(label, value=float(self.value), key=f"{key_prefix}_value")
-            return UniformFunction1(value=value, is_vector=False)
+            return UniformFunction1(value=value, _is_vector=False, _selectable=self.selectable)
 
 
 @dataclass
@@ -272,6 +246,12 @@ class TableFileFunction1(Function1):
         # but we don't track that internally
         return False
 
+    @property
+    def selectable(self) -> bool:
+        # TableFile can be either vector or scalar,
+        # but we don't track that internally
+        return True
+
     def to_foam(self) -> str:
         return f"""tableFile;
 tableFileCoeffs
@@ -281,12 +261,8 @@ tableFileCoeffs
     interpolationScheme {self.interpolation_scheme};
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
+    def render_ui(self, label: str, key_prefix: str) -> Function1:
         """Render UI for this Function1 and return updated instance."""
-        # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix, skip_selector)
-        if new_fn is not self:
-            return new_fn
 
         # Render tableFile-specific UI
         st.info("Time series from an OpenFOAM format file")
@@ -324,10 +300,16 @@ class RampFunction1(Function1):
     start: float = 0.0
     duration: float = 10.0
 
+    _is_vector: bool = False
+    _selectable: bool = True
+
     @property
     def is_vector(self) -> bool:
-        # Ramp functions are typically scalar
-        return False
+        return self._is_vector
+
+    @property
+    def selectable(self) -> bool:
+        return self._selectable
 
     def to_foam(self) -> str:
         return f"""{self.ramp_type};
@@ -337,12 +319,8 @@ class RampFunction1(Function1):
     duration {self.duration};
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
+    def render_ui(self, label: str, key_prefix: str) -> Function1:
         """Render UI for this Function1 and return updated instance."""
-        # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix, skip_selector)
-        if new_fn is not self:
-            return new_fn
 
         # Render ramp-specific UI
         st.info("Ramp function (gradual increase)")
@@ -350,10 +328,10 @@ class RampFunction1(Function1):
         ramp_types = ["linearRamp", "halfCosineRamp", "quadraticRamp",
                       "quarterCosineRamp", "quarterSineRamp", "stepFunction"]
 
-        ramp_type = st.selectbox(
+        ramp_type = st.segmented_control(
             "Ramp Type",
             options=ramp_types,
-            index=ramp_types.index(self.ramp_type) if self.ramp_type in ramp_types else 0,
+            default=self.ramp_type if self.ramp_type in ramp_types else ramp_types[0],
             key=f"{key_prefix}_ramp_type"
         )
 
@@ -381,7 +359,16 @@ class CSVFileFunction1(Function1):
     """CSV file Function1 for time series data."""
     file_path: str = "PATH/TO/FILE.csv"
     header_lines: int = 4
-    is_vector: bool = False
+    _is_vector: bool = False
+    _selectable: bool = True
+
+    @property
+    def is_vector(self) -> bool:
+        return self._is_vector
+
+    @property
+    def selectable(self) -> bool:
+        return self._selectable
 
     def to_foam(self) -> str:
         component_cols = "(1 2 3)" if self.is_vector else "1"
@@ -398,12 +385,8 @@ csvFileCoeffs
     interpolationScheme linear;
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
+    def render_ui(self, label: str, key_prefix: str) -> Function1:
         """Render UI for this Function1 and return updated instance."""
-        # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix, skip_selector)
-        if new_fn is not self:
-            return new_fn
 
         # Render csvFile-specific UI
         st.info("Time series from a CSV file")
@@ -424,7 +407,8 @@ csvFileCoeffs
         return CSVFileFunction1(
             file_path=file_path,
             header_lines=header_lines,
-            is_vector=self.is_vector
+            _is_vector=self.is_vector,
+            _selectable=self.selectable
         )
 
 
@@ -436,10 +420,16 @@ class CosineFunction1(Function1):
     scale: float = 1.0
     level: float = 0.0
 
+    _is_vector: bool = False
+    _selectable: bool = True
+
     @property
     def is_vector(self) -> bool:
-        # Cosine functions are typically scalar
-        return False
+        return self._is_vector
+
+    @property
+    def selectable(self) -> bool:
+        return self._selectable
 
     def to_foam(self) -> str:
         return f"""cosine;
@@ -451,12 +441,8 @@ cosineCoeffs
     level {self.level};
 }}"""
 
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
+    def render_ui(self, label: str, key_prefix: str) -> Function1:
         """Render UI for this Function1 and return updated instance."""
-        # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix, skip_selector)
-        if new_fn is not self:
-            return new_fn
 
         # Render cosine-specific UI
         st.info("Cosine wave function")
@@ -498,20 +484,21 @@ class CustomFunction1(Function1):
     """Custom Function1 for direct code entry."""
     code: str = "// Custom Function1"
     _is_vector: bool = False
+    _selectable: bool = True
 
     @property
     def is_vector(self) -> bool:
         return self._is_vector
 
+    @property
+    def selectable(self) -> bool:
+        return self._selectable
+
     def to_foam(self) -> str:
         return self.code
 
-    def render_ui(self, label: str, key_prefix: str, skip_selector: bool = False) -> Function1:
+    def render_ui(self, label: str, key_prefix: str) -> Function1:
         """Render UI for this Function1 and return updated instance."""
-        # First, allow selection of different Function1 type
-        new_fn = self.select_function_type(label, key_prefix, skip_selector)
-        if new_fn is not self:
-            return new_fn
 
         # Render custom-specific UI
         st.info("Custom Function1 configuration")
@@ -538,7 +525,7 @@ Function1Registry.register(
     function_type="uniform",
     display_name="Uniform (constant) value",
     creator_class=UniformFunction1,
-    parser=UniformFunction1.from_foam,
+    parser=UniformFunction1.parse,
     type_detector=lambda obj: isinstance(obj, UniformFunction1)
 )
 
@@ -547,7 +534,7 @@ Function1Registry.register(
     function_type="tableFile",
     display_name="Table file (time series)",
     creator_class=TableFileFunction1,
-    parser=lambda foam_str: TableFileFunction1.from_foam(foam_str) if "tableFile" in foam_str else None,
+    parser=lambda foam_str: TableFileFunction1.parse(foam_str) if "tableFile" in foam_str else None,
     type_detector=lambda obj: isinstance(obj, TableFileFunction1)
 )
 
@@ -556,7 +543,7 @@ Function1Registry.register(
     function_type="ramp",
     display_name="Ramp (gradual increase)",
     creator_class=RampFunction1,
-    parser=lambda foam_str: RampFunction1.from_foam(foam_str) if any(ramp in foam_str for ramp in ["linearRamp", "halfCosineRamp", "quadraticRamp"]) else None,
+    parser=lambda foam_str: RampFunction1.parse(foam_str) if any(ramp in foam_str for ramp in ["linearRamp", "halfCosineRamp", "quadraticRamp"]) else None,
     type_detector=lambda obj: isinstance(obj, RampFunction1)
 )
 
@@ -565,7 +552,7 @@ Function1Registry.register(
     function_type="csvFile",
     display_name="CSV file (time series)",
     creator_class=CSVFileFunction1,
-    parser=lambda foam_str: CSVFileFunction1.from_foam(foam_str) if "csvFile" in foam_str else None,
+    parser=lambda foam_str: CSVFileFunction1.parse(foam_str) if "csvFile" in foam_str else None,
     type_detector=lambda obj: isinstance(obj, CSVFileFunction1)
 )
 
@@ -574,7 +561,7 @@ Function1Registry.register(
     function_type="cosine",
     display_name="Cosine wave",
     creator_class=CosineFunction1,
-    parser=lambda foam_str: CosineFunction1.from_foam(foam_str) if "cosine" in foam_str else None,
+    parser=lambda foam_str: CosineFunction1.parse(foam_str) if "cosine" in foam_str else None,
     type_detector=lambda obj: isinstance(obj, CosineFunction1)
 )
 

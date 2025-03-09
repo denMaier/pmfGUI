@@ -1,6 +1,7 @@
 """
 UI functions for boundary condition editing using the class-based approach.
 """
+from pandas.core.arrays.base import isin
 import streamlit as st
 from typing import Dict, List, Tuple, Any, Optional
 import re
@@ -25,91 +26,76 @@ def select_boundary_condition_type(field: str, boundary_name: str, current_type:
     """
     # Get available boundary condition types for this field
     bc_types = get_boundary_condition_types(field)
+    bc_types.append("custom")
 
     # Initialize selection state if not exists
     selection_key = f'select_{field}_{boundary_name}'
     if f'bc_selections_{field}' not in st.session_state:
-        st.session_state[f'bc_selections_{field}'] = {}
+        st.session_state["boundary"] = {}
 
-    if selection_key not in st.session_state[f'bc_selections_{field}']:
+    if selection_key not in st.session_state["boundary"]:
         # Use current type if valid, otherwise default to first type
         if current_type in bc_types:
-            st.session_state[f'bc_selections_{field}'][selection_key] = current_type
+            st.session_state["boundary"][selection_key] = current_type
         else:
-            st.session_state[f'bc_selections_{field}'][selection_key] = bc_types[0] if bc_types else "Custom"
+            st.session_state["boundary"][selection_key] = "custom"
 
     # Create a selectbox for boundary condition type
     selected_bc_type = st.selectbox(
         "Boundary Condition Type",
         options=bc_types,
-        index=bc_types.index(st.session_state[f'bc_selections_{field}'][selection_key]) if st.session_state[f'bc_selections_{field}'][selection_key] in bc_types else 0,
+        index=bc_types.index(st.session_state["boundary"][selection_key]) if st.session_state["boundary"][selection_key] in bc_types else 0,
         key=selection_key
     )
 
     return selected_bc_type
 
-def generate_boundary_condition(field: str, boundary_name: str, bc_type: str, default_dict: Dict[str, Any]) -> BoundaryCondition:
+def make_custom(field: str, boundary_name: str, default_dict: Dict[str, Any]) -> BoundaryCondition:
     """
     Render editor for a boundary condition.
 
     Args:
         field: Field name (U, p, T, etc.)
         boundary_name: Name of the boundary
-        bc_type: Boundary condition type
         default_dict: Default boundary condition dictionary
 
     Returns:
         Updated BoundaryCondition object
     """
-    if bc_type == "Custom":
-        # For custom type, show a text area with the raw dictionary
-        st.info("Enter custom boundary condition in OpenFOAM syntax")
+    # For custom type, show a text area with the raw dictionary
+    st.info("Enter custom boundary condition in OpenFOAM syntax")
 
-        # Convert dictionary to string for editing
-        default_str = "\n".join([f"{k} {v};" for k, v in default_dict.items()])
+    # Convert dictionary to string for editing
+    default_str = "\n".join([f"{k} {v};" for k, v in default_dict.items()])
 
-        custom_text = st.text_area(
-            "Custom Boundary Condition",
-            value=default_str,
-            height=200,
-            key=f"{field}_{boundary_name}_custom"
-        )
+    custom_text = st.text_area(
+        "Custom Boundary Condition",
+        value=default_str,
+        height=200,
+        key=f"{field}_{boundary_name}_custom"
+    )
 
-        # Parse the custom text back to a dictionary
-        custom_dict = {}
-        custom_dict["type"] = default_dict.get("type", "fixedValue")
+    # Parse the custom text back to a dictionary
+    custom_dict = {}
+    custom_dict["type"] = default_dict.get("type", "fixedValue")
 
-        for line in custom_text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("//"):
-                continue
+    for line in custom_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("//"):
+            continue
 
-            if ";" in line:
-                line = line.rstrip(";")
+        if ";" in line:
+            line = line.rstrip(";")
 
-            parts = line.split(maxsplit=1)
-            if len(parts) == 2:
-                key, value = parts
-                custom_dict[key.strip()] = value.strip()
+        parts = line.split(maxsplit=1)
+        if len(parts) == 2:
+            key, value = parts
+            custom_dict[key.strip()] = value.strip()
 
-        # Create a boundary condition from the dictionary
-        return BoundaryCondition.from_dict(custom_dict)
-    else:
-        # Get template for this field and boundary condition type
-        template = get_boundary_condition_template(field, bc_type)
+    # Create a boundary condition from the dictionary
+    return BoundaryCondition.from_dict(custom_dict)
 
-        # Create a boundary condition from the default dictionary
-        bc = BoundaryCondition.from_dict(default_dict)
-
-        # If the types don't match, use the template but preserve values where possible
-        if bc.type != bc_type:
-            # Create a new boundary condition from template
-            bc = template
-            bc.type = bc_type
-
-        return bc
-
-def preselect_function1_types(field: str, boundary_name: str, bc: BoundaryCondition) -> None:
+def preselect_function1_types(field: str, boundary_name: str, bc: BoundaryCondition) -> BoundaryCondition:
     """
     Pre-select Function1 types for a boundary condition outside the form.
 
@@ -119,32 +105,39 @@ def preselect_function1_types(field: str, boundary_name: str, bc: BoundaryCondit
         bc: BoundaryCondition object to examine
     """
     # Initialize session state for Function1 selections if needed
-    if 'function1_selections' not in st.session_state:
-        st.session_state['function1_selections'] = {}
+    if 'boundary' not in st.session_state:
+        st.session_state['boundary'] = {}
 
     # Find all Function1 fields in this boundary condition
-    for field_key, field_value in bc.entries.items():
-        if isinstance(field_value, Function1):
-            f1_key = f"{field}_{boundary_name}_{field_key}_f1_type"
+    selected_types = {}
+    for entry_key, entry_value in bc.entries.items():
+        if isinstance(entry_value, Function1):
+            f1_key = f"{field}_{boundary_name}_{entry_key}_f1_type"
+
+            if not entry_value.selectable:
+                selected_types[f1_key] = Function1Registry.detect_type(entry_value)
+                continue
 
             # Initialize with detected type if not already set
-            if f1_key not in st.session_state['function1_selections']:
-                current_type = Function1Registry.detect_type(field_value)
-                st.session_state['function1_selections'][f1_key] = current_type
+            if f1_key not in st.session_state['boundary']:
+                current_type = Function1Registry.detect_type(entry_value)
+                st.session_state['boundary'][f1_key] = current_type
 
             # Create the Function1 type selector
             function1_options = Function1Registry.get_type_options()
             selected_type = st.selectbox(
-                f"{field_key} Type",
+                f"Function1 Type for Keyword {entry_key}",
                 options=[t[0] for t in function1_options],
                 format_func=lambda x: next((t[1] for t in function1_options if t[0] == x), x),
-                index=[t[0] for t in function1_options].index(st.session_state['function1_selections'][f1_key])
-                    if st.session_state['function1_selections'][f1_key] in [t[0] for t in function1_options] else 0,
+                index=[t[0] for t in function1_options].index(st.session_state['boundary'][f1_key])
+                    if st.session_state['boundary'][f1_key] in [t[0] for t in function1_options] else 0,
                 key=f1_key
             )
+            if st.session_state['boundary'][f1_key] != selected_type:
+                bc.entries[entry_key] = Function1.create(selected_type, is_vector=entry_value.is_vector)
+                st.session_state['boundary'][f1_key] = selected_type
 
-            # Update the session state with the selected type
-            st.session_state['function1_selections'][f1_key] = selected_type
+    return bc
 
 def save_boundary_condition(field: str, boundary_name: str, bc: BoundaryCondition, foam_file_path: Path) -> Tuple[bool, str]:
     """
