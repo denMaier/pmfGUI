@@ -1,6 +1,6 @@
 import streamlit as st
-from state import *
-from stages.boundary import *
+from stages.boundary.boundary import main
+from state import get_selected_case_path, has_mesh
 
 st.title("Boundary Conditions")
 

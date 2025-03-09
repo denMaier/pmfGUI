@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 from foamlib import FoamFieldFile
 
-from stages.boundaryAux.boundary_database import *
-from stages.boundaryAux.function1 import *
+from stages.boundary.boundary_condition import BoundaryCondition, get_boundary_condition_types
+from stages.boundary.function1 import Function1Registry, Function1
 
 def select_boundary_condition_type(field: str, boundary_name: str, current_type: str) -> str:
     """

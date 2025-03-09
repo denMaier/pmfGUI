@@ -16,9 +16,6 @@ def initialize_state():
         case_data["Mesh"] = {
                     "cellZones": {}, # Since file format is hard to read
                     "showMeshVis": False,
-                    "reader": None, # pyVista Reader
-                    "internal": None, # Read with pyVista
-                    "boundaries": None, # Read with pyVista
                     "df_vertices": None, # For 2D Mesh generator
                     "df_edges": None, # For 2D Mesh generator
                     "edgeDict": {}, # For 2D Mesh generator
@@ -29,15 +26,17 @@ def initialize_state():
                     "selected": None,  # Initialize ALL values
                     "unsaturated": False
                 }
-        case_data["Materials"] = {
-                    "cell_zones_data": {}
-                }
     if "vis" not in st.session_state:
         st.session_state.vis = {}
         vis = st.session_state.vis
         vis["show_mesh"] = True
         vis["bg_darkness"] = 0.35
         vis["selected_palette"] = 'deep'
+        vis["style"] = 'surface'
+        vis["color_patches"] = False
+        vis["show_boundaries"] = True
+        vis["only_boundaries"] = False
+        vis["opacity"] = 1.0
 
 PATHS = {
 "cellZones": "constant/polyMesh/cellZones",

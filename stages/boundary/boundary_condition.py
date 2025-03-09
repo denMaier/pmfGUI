@@ -5,7 +5,9 @@ from typing import Dict, List, Union, Optional, Any
 from dataclasses import dataclass, field
 import numpy as np
 import streamlit as st
-from stages.boundaryAux.function1 import *
+from stages.boundary.function1 import Function1, Function1Registry
+from boundaryConditions.boundary_templates import BOUNDARY_CONDITION_TEMPLATES
+
 
 @dataclass
 class BoundaryCondition:
@@ -107,7 +109,6 @@ class BoundaryCondition:
                     )
                 elif "uniform" in entry_value or any(f1_type in entry_value for f1_type in ["tableFile", "csvFile", "ramp", "cosine"]):
                     # This looks like a Function1 string - parse and render
-                    is_vector = "(" in entry_value and ")" in entry_value  # Simple check for vectors
                     f1 = Function1.from_foam(entry_value)
                     updated_entries[entry_key] = f1.render_ui(
                         entry_key,
@@ -133,111 +134,6 @@ class BoundaryCondition:
         )
 
         return updated_bc
-
-# Dictionary of boundary condition templates using GenericFunction1
-BOUNDARY_CONDITION_TEMPLATES = {
-    "U": {
-        "fixedValue": BoundaryCondition(
-            type="uniformFixedValue",
-            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True)},
-            description=""
-        ),
-        "zeroGradient": BoundaryCondition(
-            type="zeroGradient",
-            description=""
-        )
-    },
-    "D": {
-        "fixedValue": BoundaryCondition(
-            type="uniformFixedValue",
-            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True)},
-            description=""
-        ),
-        "fixedDisplacement": BoundaryCondition(
-            type="fixedDisplacement",
-            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)},
-            description=""
-        ),
-        "fixedDisplacementZeroShear": BoundaryCondition(
-            type="fixedDisplacementZeroShear",
-            entries={"value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)},
-            description="Fixed displacement with zero shear stress"
-        ),
-        "traction": BoundaryCondition(
-            type="poroTraction",
-            entries={
-                "total": True,
-                "traction": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True),
-                "pressure": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
-                "value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)
-            },
-            description="traction boundary for fully saturated conditions"
-        ),
-        "varSatTraction": BoundaryCondition(
-            type="varSatPoroTraction",
-            entries={
-                "total": True,
-                "effectiveStressModel": "suctionCutOff",
-                "traction": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=True),
-                "pressure": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
-                "value": UniformFunction1(value=[0, 0, 0], _is_vector=True, _selectable=False)
-            },
-            description="Variable saturation traction boundary"
-        )
-    },
-    "p": {
-        "fixedValue": BoundaryCondition(
-            type="uniformFixedValue",
-            entries={"value": UniformFunction1(value=0.0, _is_vector=False, _selectable=True)},
-            description=""
-        ),
-        "zeroGradient": BoundaryCondition(
-            type="zeroGradient",
-            description=""
-        )
-    },
-    "p_rgh": {
-        "fixedValue": BoundaryCondition(
-            type="uniformFixedValue",
-            entries={"value": UniformFunction1(value=0.0, _is_vector=False, _selectable=True)},
-            description=""
-        ),
-        "fixedPotential": BoundaryCondition(
-            type="fixedPotential",
-            entries={
-                "h0": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
-                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
-            },
-            description="Fixed hydraulic potential h[m]"
-        ),
-        "fixedFlux": BoundaryCondition(
-            type="fixedPoroFlux",
-            entries={
-                "flux": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
-                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
-            },
-            description="Fixed volume flux q[m/s]"
-        ),
-        "seepageOutlet": BoundaryCondition(
-            type="seepageOutlet",
-            entries={
-                "outletValue": UniformFunction1(value=0.0, _is_vector=False, _selectable=False),
-                "h0": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
-                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
-            },
-            description="Variable pressure/flow depending on groundwater level"
-        ),
-        "limitedHeadInfiltration": BoundaryCondition(
-            type="limitedHeadInfiltration",
-            entries={
-                "flux": UniformFunction1(value=0.0, _is_vector=False, _selectable=True),
-                "pMax": UniformFunction1(value=0.0, _is_vector=False, _selectable=False),
-                "value": UniformFunction1(value=0.0, _is_vector=False, _selectable=False)
-            },
-            description="Variable pressure/flow depending on pressure level"
-        )
-    }
-}
 
 def get_boundary_condition_template(field: str, bc_type: str) -> BoundaryCondition:
     """Get a boundary condition template for a field and type."""

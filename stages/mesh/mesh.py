@@ -1,9 +1,11 @@
 import streamlit as st
 from foamlib import FoamCase
 from pathlib import Path
-from state import *
-from stages.meshAux.helpers import *
-from stages.meshAux.make2D import *
+from state import *get_case,
+from stages.mesh.helpers import *
+from stages.mesh.make2D import *
+import pyvista as pv
+from plotting_helpers import get_openfoam_visualizer
 
 @st.fragment
 def main3D():
@@ -142,3 +144,62 @@ def make2DMesh(foamCase: FoamCase):
                     st.success("Mesh created successfully")
                 except Exception as e:
                     st.error(f"Failed to create mesh: {e}")
+
+def plot_foam_mesh(case_path, show_mesh=True, bg_darkness=0.35,
+                  selected_palette="deep", style="surface",
+                  color_patches=False, show_boundaries=True,
+                  only_boundaries=False, opacity=1.0):
+    """
+    Plot the OpenFOAM mesh with the selected visualization options.
+
+    Parameters:
+        case_path: Path to the OpenFOAM case
+        show_mesh: Whether to show mesh edges
+        bg_darkness: Background darkness (0.1-0.4)
+        selected_palette: Color palette to use
+        style: Mesh style (surface, wireframe, points)
+        color_patches: Whether to color patches differently
+        show_boundaries: Whether to show boundary patches
+        only_boundaries: Whether to show only boundary patches
+        opacity: Opacity of the mesh (0.1-1.0)
+    """
+    # Get the background color based on darkness
+    bg_value = 1.0 - bg_darkness
+    bg_color = (bg_value, bg_value, bg_value)
+
+    # Get the visualizer instance (cached)
+    visualizer = get_openfoam_visualizer(case_path)
+
+    # Force refresh if the case has changed
+    if visualizer.has_case_changed():
+        with st.spinner("Case has changed - refreshing data..."):
+            visualizer.refresh()
+
+    # Create a PyVista plotter for Streamlit
+    plotter = pv.Plotter()
+    plotter.background_color = bg_color
+
+    # Get the custom colormap for this plot
+    cmap = visualizer.COLOR_PALETTES.get(selected_palette, visualizer.COLOR_PALETTES["deep"])
+
+    # Edge color based on background
+    edge_color = 'black' if bg_darkness < 0.25 else 'white'
+
+    # Actually visualize the mesh
+    visualizer.visualize_mesh(
+        plotter=plotter,
+        show_edges=show_mesh,
+        style=style,
+        color_patches=color_patches,
+        show_boundaries=show_boundaries,
+        only_boundaries=only_boundaries,
+        opacity=opacity,
+        edge_color=edge_color,
+        boundary_palette=selected_palette
+    )
+
+    # Set a nice camera position
+    plotter.view_isometric()
+
+    # Render in Streamlit using stpyvista
+    stpyvista(plotter, key="mesh_viz")

@@ -1,8 +1,8 @@
 from pathlib import Path
 from foamlib import FoamFieldFile
-from state import *
-from stages.boundaryAux.boundary_database import *
-from stages.boundaryAux.boundary_parsing_ui import *
+from state import SOLVER_OPTIONS, get_file, get_solver_type, get_case, FIELD_REGIONS, FIELD_DEFAULT_VALUE
+from stages.boundary.boundary_condition import BoundaryCondition, get_boundary_condition_template,
+from stages.boundary.boundary_helpers import select_boundary_condition_type
 
 @st.fragment
 def main():

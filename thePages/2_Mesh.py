@@ -1,7 +1,7 @@
 import streamlit as st
-from state import *
-from stages.mesh import main3D, main2D
-from plot_with_paraview import add_visu_sidebar, plot_foam_mesh
+from state import get_selected_case_path, get_case_data, has_mesh
+from stages.mesh.mesh import main3D, main2D, plot_foam_mesh
+from plotting_helpers import add_visu_sidebar
 
 st.title("Mesh")  # Change the title for each page
 
@@ -47,8 +47,15 @@ else:
                 st.subheader("Current mesh")
                 vis = st.session_state.vis
 
+                # Use our new visualization function
                 plot_foam_mesh(
-                    get_file("dotFoam"),
-                    vis["show_mesh"],vis["bg_darkness"],
-                    vis["selected_palette"]
+                    get_selected_case_path(),
+                    show_mesh=vis["show_mesh"],
+                    bg_darkness=vis["bg_darkness"],
+                    selected_palette=vis["selected_palette"],
+                    style=vis["style"],
+                    color_patches=vis["color_patches"],
+                    show_boundaries=vis["show_boundaries"],
+                    only_boundaries=vis["only_boundaries"],
+                    opacity=vis["opacity"]
                 )
