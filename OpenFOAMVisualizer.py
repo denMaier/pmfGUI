@@ -27,7 +27,7 @@ class OpenFOAMVisualizer:
         "colorblind": mcolors.LinearSegmentedColormap.from_list("colorblind", ["#0072B2", "#009E73", "#D55E00", "#CC79A7", "#F0E442", "#56B4E9"])
     }
 
-    def __init__(self, case_path: Union[str, Path]):
+    def __init__(self, case_path: Union[str, Path], region: Optional[str] = None):
         """
         Initialize the OpenFOAM visualization backend.
 
@@ -43,6 +43,10 @@ class OpenFOAMVisualizer:
         self.foam_file = None
         self.time_dirs = []
         self.latest_time = None
+
+        # Region handling
+        self.has_regions = bool(region)
+        self.region = region
 
         # File modification timestamps for cache invalidation
         self.cache_timestamps = {}
@@ -94,7 +98,10 @@ class OpenFOAMVisualizer:
             path = Path(path)
 
         # Get current timestamp
-        current_timestamp = os.path.getmtime(path)
+        try:
+            current_timestamp = os.path.getmtime(path)
+        except FileNotFoundError:
+            return False
 
         # Compare with cached timestamp
         if str(path) in self.cache_timestamps:
@@ -115,19 +122,18 @@ class OpenFOAMVisualizer:
 
         return False
 
-    def _get_time_dirs(self) -> List[float]:
+    def _get_time_dirs(self) -> List[str]:
         """Get all time directories in the case, sorted numerically."""
         # Use foamlib to get time directories
         time_dirs = []
-        for item in self.foam_case:
-            try:
-                time_dirs.append(float(item.name))
-            except ValueError:
-                # Skip non-numeric directories
-                pass
+        for item in self.case_path.iterdir():
+            if item.is_dir() and self._is_time_dir(item.name):
+                # Add the original directory name (not converted to float)
+                time_dirs.append(item.name)
+        time_dirs.sort(key=lambda x: float(x) if x != 'constant' else -1)
         return sorted(time_dirs)
 
-    def _get_latest_time(self) -> float:
+    def _get_latest_time(self) -> str:
         """Get the latest time directory."""
         if not self.time_dirs:
             raise ValueError("No time directories found in the case")
@@ -143,7 +149,35 @@ class OpenFOAMVisualizer:
         except ValueError:
             return False
 
-    def read_line_sample(self, sample_name: str, time: Optional[float] = None, force_reload: bool = False) -> pd.DataFrame:
+    def _has_regions(self, block_names: List[str]) -> bool:
+        """Check if the case has regions."""
+        if block_names and 'internalMesh' not in block_names:
+            self.has_regions = True
+        return self.has_regions
+
+    def get_region_path(self, time_dir: str) -> Path:
+        """
+        Get the path for a specific time directory, considering the region if set.
+
+        Parameters:
+            time_dir: Time directory name
+
+        Returns:
+            Path to the time directory for the specific region
+        """
+        if self.region and time_dir == 'constant':
+            # For constant directory, regions are stored in constant/{region}
+            return self.case_path / time_dir / self.region
+        elif self.region:
+            # For time directories, regions might be in {time}/{region}
+            region_path = self.case_path / time_dir / self.region
+            if region_path.exists():
+                return region_path
+
+        # Default (no region or region directory doesn't exist)
+        return self.case_path / time_dir
+
+    def read_line_sample(self, sample_name: str, time: Optional[str] = None, force_reload: bool = False) -> pd.DataFrame:
         """
         Read a line sample from postProcessing directory.
 
@@ -169,14 +203,16 @@ class OpenFOAMVisualizer:
             raise FileNotFoundError(f"Sample directory not found: {pp_dir}")
 
         # Find the closest time directory
-        time_dirs = [float(d.name) for d in pp_dir.iterdir() if self._is_time_dir(d.name)]
+        time_dirs = [d.name for d in pp_dir.iterdir() if self._is_time_dir(d.name)]
         if not time_dirs:
             raise FileNotFoundError(f"No time directories found in {pp_dir}")
+        float_time_dirs = [float(d) for d in time_dirs]
 
-        closest_time = min(time_dirs, key=lambda x: abs(x - time))
+        closest_time = min(float_time_dirs, key=lambda x: abs(x - float(time)))
+        closest_time_index = float_time_dirs.index(closest_time)
 
         # Check if the directory has been modified since last read
-        time_dir = pp_dir / str(closest_time)
+        time_dir = pp_dir / time_dirs[closest_time_index]
         if not force_reload and not self.has_case_changed(time_dir):
             if cache_key in self._data_cache:
                 return self._data_cache[cache_key]
@@ -509,7 +545,7 @@ class OpenFOAMVisualizer:
 
         return ax
 
-    def read_full_case(self, time: Optional[float] = None, force_reload: bool = False) -> pv.MultiBlock:
+    def read_full_case(self, time: Optional[str] = None, force_reload: bool = False) -> pv.MultiBlock:
         """
         Read the full OpenFOAM case using PyVista's OpenFOAMReader.
 
@@ -520,32 +556,46 @@ class OpenFOAMVisualizer:
         Returns:
             PyVista MultiBlock dataset
         """
-        if time is None:
+        if time is None or time == 'constant':
             time = self.latest_time
 
         # Check cache first (unless force_reload is True)
         cache_key = f"full_case_{time}"
+        if self.region:
+            cache_key += f"_{self.region}"
 
         if not force_reload:
             # Check if the case has been modified
             if not self.has_case_changed(self.case_path / "constant") and \
-               not self.has_case_changed(self.case_path / str(time)):
+            (time == 'constant' or not self.has_case_changed(self.case_path / time)):
                 if cache_key in self._data_cache:
                     return self._data_cache[cache_key]
 
         # Use PyVista's OpenFOAMReader
         reader = pv.OpenFOAMReader(str(self.foam_file))
 
-        # Find the closest time index
+        # Find the matching time
         time_values = reader.time_values
         if not time_values:
             raise ValueError("No time steps found in the OpenFOAM case")
 
-        closest_time_idx = min(range(len(time_values)), key=lambda i: abs(time_values[i] - time))
-        reader.set_active_time_value(time_values[closest_time_idx])
+        # Try to find exact string match in reader's time_names if available
+        if hasattr(reader, 'time_names') and time in reader.time_names:
+            time_idx = reader.time_names.index(time)
+        else:
+            # Fall back to numeric comparison
+            try:
+                time_val = float(time)
+                time_idx = min(range(len(time_values)), key=lambda i: abs(time_values[i] - time_val))
+            except ValueError:
+                # If conversion fails, use the latest time
+                time_idx = len(time_values) - 1
+
+        reader.set_active_time_value(time_values[time_idx])
 
         # Get data with all fields
         reader.all_patches = True
+
         reader.add_dimensions = True
 
         # Read all data
@@ -554,14 +604,19 @@ class OpenFOAMVisualizer:
         # Cache the result
         self._data_cache[cache_key] = data
 
+        if self.region:
+            data = data[self.region]
+        elif 'defaultRegion' in data.keys():
+            data = data['defaultRegion']
+
         return data
 
-    def visualize_mesh(self, time: Optional[float] = None, plotter=None,
+    def visualize_mesh(self, time: Optional[str] = None, plotter=None,
                        show_edges: bool = True, color: Optional[str] = None,
                        style: str = 'surface', color_patches: bool = False,
                        show_boundaries: bool = True, only_boundaries: bool = False,
                        opacity: float = 1.0, edge_color: str = 'black',
-                       boundary_palette: str = 'plasma', force_reload: bool = False, **kwargs):
+                       boundary_palette: str = 'deep', force_reload: bool = False, **kwargs):
         """
         Visualize only the mesh geometry from the OpenFOAM case.
 
@@ -596,16 +651,21 @@ class OpenFOAMVisualizer:
         # Filter and collect blocks based on options
         for i in range(data.n_blocks):
             block = data[i]
+            block_name = data.keys()[i]
+
             if hasattr(block, 'n_points') and block.n_points > 0:
+                # Check if this is an internal mesh or boundary patch
+                is_internal = "internalMesh" in block_name.lower()
+
                 # Skip internal mesh if only_boundaries is True
-                if only_boundaries and "internalMesh" in data.keys()[i].lower():
+                if only_boundaries and is_internal:
                     continue
                 # Skip boundary patches if show_boundaries is False
-                if not show_boundaries and "internalMesh" not in data.keys()[i].lower():
+                if not show_boundaries and not is_internal:
                     continue
 
                 blocks.append(block)
-                patch_names.append(data.keys()[i])
+                patch_names.append(block_name)
 
         if not blocks:
             raise ValueError("No valid blocks found in the case data to visualize")
@@ -653,9 +713,11 @@ class OpenFOAMVisualizer:
         if color_patches:
             plotter.add_legend()
 
-        # Add time information to title
-        current_time = data._get_attrs().get('time', time if time is not None else self.latest_time)
-        plotter.add_text(f'Time: {current_time}s', position='upper_edge')
+        # Add time and region information to title
+        title = f'Time: {time if time is not None else self.latest_time}'
+        if self.region:
+            title += f', Region: {self.region}'
+        plotter.add_text(title, position='upper_edge')
 
         return plotter
 

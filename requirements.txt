@@ -3,5 +3,3 @@ foamlib
 pathlib
 stpyvista
 st-annotated-text
-seaborn
-scipy

@@ -40,16 +40,14 @@ def main():
                         st.error(f"Error creating case: {e}")
 
     elif method == "Browse":
-        if st.button("Browse"):
-            browse_directory()
+        browse_directory()
 
     if get_selected_case_path() is not None:
         case_dir = get_selected_case_path()
         case_data = get_case_data()
         PATHS["dotFoam"] = case_dir/f"{get_selected_case_name()}.foam"
-        dotFoam = get_file("dotFoam")
-        if not Path(dotFoam).exists():
-           dotFoam.touch()
+        if not Path(PATHS["dotFoam"]).exists():
+           Path(PATHS["dotFoam"]).touch()
     else:
         st.info("No case directory selected yet.")
 
@@ -57,7 +55,7 @@ def main():
 
 def createNew(dest: Path) -> None:
     """Create new case with template validation"""
-    template_path = Path(os.environ.get("PMF_TEMPLATES", "")) / "base"
+    template_path = Path(os.getcwd()) / "templates" / "base"
     if not template_path.exists():
         raise ValueError(f"Template directory not found: {template_path}")
 
@@ -80,31 +78,65 @@ def agree(case_name: str, case_dir: Path) -> None:
         st.rerun()
 
 def browse_directory():
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes('-topmost', True)
-    # Safely access nested dictionary keys
+    """Provides multiple methods to select an OpenFOAM case directory."""
+
+    # Get default value and available directories
     initial_dir = get_selected_case_path()
-    if initial_dir is not None:
-        if not initial_dir.exists():
-            initial_dir = Path(ROOT_DIR)
-            if not initial_dir.exists():
-                initial_dir = os.getcwd()
-    else:
+    if initial_dir is None or not initial_dir.exists():
         initial_dir = Path(ROOT_DIR)
-        if not initial_dir.exists():
-            initial_dir = os.getcwd()
+
+    # Option 1: Direct path input
+    st.write("### Enter Directory Path")
+    directory = st.text_input(
+        "Enter the full path to your OpenFOAM case directory:",
+        value=str(initial_dir),
+        key="dir_path_input"
+    )
+
+    if st.button("Load From Path"):
+        if os.path.isdir(directory):
+            load_state(directory)
+            case_name = os.path.basename(os.path.normpath(directory))
+            set_selected_case(case_name, Path(directory))
+            st.success(f"Case directory created and saved at: {directory}")
+        else:
+            st.error(f"The path {directory} is not a valid directory")
+
+    # Option 2: Browse from ROOT_DIR
+    st.write("### Select from existing directories")
+
+    # Optional: Allow to set a custom search directory
+    search_dir = st.text_input(
+        "Search directory (leave empty for default):",
+        value="",
+        key="search_dir_input"
+    )
+
+    # Use either the custom search dir or the ROOT_DIR
+    browse_root = search_dir if search_dir and os.path.isdir(search_dir) else ROOT_DIR
+
+    # Find directories in the browse_root
     try:
-        directory = askdirectory(title="Select OpenFOAM case directory", initialdir=initial_dir)
-    except tk.TclError:
-        st.error("Tkinter error. Ensure Tkinter is installed correctly.")
-        return
+        available_dirs = [d for d in os.listdir(browse_root)
+                         if os.path.isdir(os.path.join(browse_root, d))]
+        available_dirs.sort()
 
-    root.attributes('-topmost', False)
-    root.destroy()
+        # Display the current search directory
+        st.info(f"Browsing directories in: {browse_root}")
 
-    if directory:
-        load_state(directory)
-        case_name = os.path.basename(os.path.normpath(directory))
-        set_selected_case(case_name,Path(directory))
-        st.success(f"Case directory created and saved at: {directory}")
+        # Create a selectbox for choosing a directory
+        case_dir = st.selectbox(
+            "Select an existing case:",
+            [""] + available_dirs,
+            index=0,
+            key="dir_selector"
+        )
+
+        if st.button("Load Selected Case") and case_dir:
+            directory = os.path.join(browse_root, case_dir)
+            load_state(directory)
+            case_name = os.path.basename(os.path.normpath(directory))
+            set_selected_case(case_name, Path(directory))
+            st.success(f"Case directory created and saved at: {directory}")
+    except (FileNotFoundError, PermissionError) as e:
+        st.error(f"Error accessing directory: {str(e)}")

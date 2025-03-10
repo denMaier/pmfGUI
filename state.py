@@ -35,8 +35,9 @@ def initialize_state():
         vis["style"] = 'surface'
         vis["color_patches"] = False
         vis["show_boundaries"] = True
-        vis["only_boundaries"] = False
+        vis["only_boundaries"] = True
         vis["opacity"] = 1.0
+        vis['available_regions'] = ['solid', 'poroFluid']
 
 PATHS = {
 "cellZones": "constant/polyMesh/cellZones",

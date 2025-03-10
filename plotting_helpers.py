@@ -1,9 +1,12 @@
 import streamlit as st
 from OpenFOAMVisualizer import OpenFOAMVisualizer
+from pathlib import Path
+import pyvista as pv
+
 
 # Create a singleton visualizer to ensure we only create one instance
 # This helps with caching and performance
-@st.cache_resource
+#@st.cache_resource
 def get_openfoam_visualizer(case_path):
     """Get a cached OpenFOAM visualizer for the case."""
     return OpenFOAMVisualizer(case_path)

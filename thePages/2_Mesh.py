@@ -11,14 +11,6 @@ elif not get_selected_case_path().exists(): #Better safe than sorry
     st.warning("Case does not exist. Please try Case Selection again.")
 else:
 
-    get_case_data()["Mesh"]["showMeshVis"] = st.toggle(
-        "Show Current Mesh",
-        value=get_case_data()["Mesh"]["showMeshVis"],
-        key= "Show Current Mesh Toggle 3D"
-    )
-    if get_case_data()["Mesh"]["showMeshVis"]:
-        add_visu_sidebar()
-
     col1, col2 = st.columns(2,gap="medium")
 
     with col1:
@@ -43,7 +35,14 @@ else:
 
     with col2:
         if has_mesh():
+
+            get_case_data()["Mesh"]["showMeshVis"] = st.toggle(
+                "Show Current Mesh",
+                value=get_case_data()["Mesh"]["showMeshVis"],
+                key= "Show Current Mesh Toggle 3D"
+            )
             if get_case_data()["Mesh"]["showMeshVis"]:
+                add_visu_sidebar()
                 st.subheader("Current mesh")
                 vis = st.session_state.vis
 

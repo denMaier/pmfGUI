@@ -1,11 +1,12 @@
 import streamlit as st
 from foamlib import FoamCase
 from pathlib import Path
-from state import *get_case,
-from stages.mesh.helpers import *
-from stages.mesh.make2D import *
+from state import get_case, get_file, get_case_data
+from stages.mesh.helpers import save_uploaded_file, extract_zip
+from stages.mesh.make2D import twoDEdgeDictGenerator, edgesToRibbonFMS
 import pyvista as pv
 from plotting_helpers import get_openfoam_visualizer
+from stpyvista import stpyvista
 
 @st.fragment
 def main3D():
@@ -53,7 +54,6 @@ def select_method(foamCase: FoamCase, input_types, captions, dimensions):
         meshFile = st.file_uploader("polyMesh.zip",type=['zip'], key=f"ofmesh_uploader_type_{dimensions}D")
         if  meshFile is not None:
             extract_zip(meshFile,polyMeshPath)
-            get_case_data()["Mesh"]["available"] = True
     elif input_type == "BlockMesh":
         meshFile = st.file_uploader("blockMeshDict", key=f"blockmesh_uploader_{dimensions}D")
         if meshFile is not None:
@@ -65,7 +65,6 @@ def select_method(foamCase: FoamCase, input_types, captions, dimensions):
             if success:
                 st.success(f"Saved the mesh into {saved_path}")
                 foamCase.block_mesh()
-                get_case_data()["Mesh"]["available"] = True
             else:
                 st.error("Failed to save blockMeshDict")
     elif input_type == "Gmsh":
