@@ -5,13 +5,15 @@ from state import *
 initialize_state()  # Call the initialization function
 
 st.title("Case Selection")  # Page title
+st.caption("Launch the app from a sourced OpenFOAM shell for full alpha functionality. Direct path loading still works without FOAM_RUN.")
 main()  # Call your stage function
 
 case_dir = get_selected_case_path()
 if case_dir is not None:
+    st.caption(f"Selected case path: {case_dir}")
     if not case_dir.exists():
         st.error("Selected case does not exist")
     elif st.button("Reload Case"): #better safe than sorry
         load_state(case_dir)
 else:
-    st.warning("No case selected")
+    st.info("No case selected")

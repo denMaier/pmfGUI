@@ -1,9 +1,8 @@
-from altair.utils.plugin_registry import R
 import streamlit as st
+from alpha_runtime import collect_missing_paths
 from stages.mechanical import main_mechanical
 from stages.hydraulics import main_hydraulic
 from state import *
-from pathlib import Path
 
 st.title("Materials")
 
@@ -16,10 +15,18 @@ elif not case_dir.exists():
 elif not has_mesh():
     st.warning("Please create a mesh first.")
 else:
+    missing_paths = collect_missing_paths(case_dir, ["physicsProperties", "mechanicalProperties", "poroHydraulicProperties"])
+    if missing_paths:
+        st.error("This case is missing required material files:")
+        st.code("\n".join(str(path) for path in missing_paths), language="text")
+        st.stop()
+
     foamCase = get_case()
     solver = get_solver_type()
 
-    st.write(f"Selected Case Directory: {case_dir}")
+    st.caption(f"Case path: {case_dir}")
+    st.caption(f"Mechanical save path: {case_dir / 'constant/solid/mechanicalProperties'}")
+    st.caption(f"Hydraulic save path: {case_dir / 'constant/poroFluid/poroHydraulicProperties'}")
 
     tabnames = [solver]
     if solver == "Coupled":

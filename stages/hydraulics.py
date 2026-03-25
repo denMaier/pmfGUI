@@ -1,6 +1,4 @@
 import streamlit as st
-from distutils import util
-from pathlib import Path
 from foamlib import FoamCase
 from models.hydraulic_laws import  HYDRAULIC_LAWS
 from state import *
@@ -15,23 +13,20 @@ def main_hydraulic(foamCase: FoamCase):
         with st.form("hydraulic_form"):
             st.success(f"Found {len(cell_zones)} cell zones")
 
-            tabs = st.tabs(cell_zones)
+            zone_names = list(cell_zones.keys())
+            tabs = st.tabs(zone_names)
 
             law_defaults = {"storageLaw": "storageCoeff"}
 
             if is_unsaturated():
                 law_defaults["SWCC"] = "saturated"
 
-            newZones = []
+            poroHydraulicDict = get_file('poroHydraulicProperties').as_dict()
 
             for law_type in list(law_defaults.keys()):
-                for tab, zone_name in zip(tabs, cell_zones):
+                for tab, zone_name in zip(tabs, zone_names):
                     with tab:
-
-                        poroHydraulicDict = get_file('poroHydraulicProperties').as_dict
-
                         if zone_name not in poroHydraulicDict:
-                            newZones.append(zone_name)
                             poroHydraulicDict[zone_name]={}
 
                         zone_data = poroHydraulicDict[zone_name]
@@ -59,42 +54,41 @@ def main_hydraulic(foamCase: FoamCase):
                             if isinstance(param.default_value, bool):
                                 value = st.toggle(
                                     f"{param_name} ({param.description})",
-                                    value=util.strtobool(str(current_value)),
+                                    value=str(current_value).lower() in {"1", "true", "yes", "on"},
                                     help=f"Dimensions: {param.dimensions}",
-                                    key=f"{zone_name}_{param_name}"
+                                    key=f"{zone_name}_{law_type}_{param_name}"
                                 )
-                            if isinstance(param.default_value, float):
+                            elif isinstance(param.default_value, float):
                                 value = st.number_input(
                                     f"{param_name} ({param.description})",
                                     value=float(current_value),
                                     help=f"Dimensions: {param.dimensions}",
-                                    key=f"{zone_name}_{param_name}"
+                                    key=f"{zone_name}_{law_type}_{param_name}"
                                 )
                             elif isinstance(param.default_value, int):
                                 value = st.number_input(
                                     f"{param_name} ({param.description})",
                                     value=int(current_value),
                                     help=f"Dimensions: {param.dimensions}",
-                                    key=f"{zone_name}_{param_name}"
+                                    key=f"{zone_name}_{law_type}_{param_name}"
                                 )
                             else:
                                 value = st.text_input(
                                     f"{param_name} ({param.description})",
                                     value=str(current_value),
                                     help=f"Dimensions: {param.dimensions}",
-                                    key=f"{zone_name}_{param_name}"
+                                    key=f"{zone_name}_{law_type}_{param_name}"
                                 )
 
                             zone_data[f"{law}Coeffs"][param_name] = value
 
-
-
-                        if st.form_submit_button("Save Hydraulic Properties"):
-                            with get_file('poroHydraulicProperties') as poroHydraulicProperties:
-                                for zone in cell_zones.keys():
-                                    poroHydraulicProperties[zone] = {}
-                                    for entry, value in poroHydraulicDict[zone].items():
-                                        if isinstance(value,dict):
-                                            poroHydraulicProperties[zone][entry] = {}
-                                poroHydraulicProperties.update(poroHydraulicDict)
-                                st.success(f"Saved hydraulic properties to {poroHydraulicProperties}")
+            if st.form_submit_button("Save Hydraulic Properties"):
+                with get_file('poroHydraulicProperties') as poroHydraulicProperties:
+                    for zone in zone_names:
+                        poroHydraulicProperties[zone] = {}
+                        for entry, value in poroHydraulicDict[zone].items():
+                            if isinstance(value, dict):
+                                poroHydraulicProperties[zone][entry] = {}
+                    poroHydraulicProperties.update(poroHydraulicDict)
+                    save_state(get_selected_case_path())
+                    st.success(f"Saved hydraulic properties to {poroHydraulicProperties}")

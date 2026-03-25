@@ -1,8 +1,14 @@
+import streamlit as st
 from pathlib import Path
 from foamlib import FoamFieldFile
-from state import SOLVER_OPTIONS, get_file, get_solver_type, get_case, FIELD_REGIONS, FIELD_DEFAULT_VALUE
-from stages.boundary.boundary_condition import BoundaryCondition, get_boundary_condition_template,
-from stages.boundary.boundary_helpers import select_boundary_condition_type
+from state import SOLVER_OPTIONS, get_file, get_solver_type, get_case, FIELD_REGIONS, FIELD_DEFAULT_VALUE, get_selected_case_path, save_state
+from stages.boundary.boundary_condition import BoundaryCondition, get_boundary_condition_template
+from stages.boundary.boundary_helpers import (
+    make_custom,
+    preselect_function1_types,
+    save_boundary_condition,
+    select_boundary_condition_type,
+)
 
 @st.fragment
 def main():
@@ -25,7 +31,7 @@ def main():
             patch_boundaries.append(boundary_name)
         elif boundaryTypeDict["type"] == "empty":
             empty_boundaries.append(boundary_name)
-        elif boundaryTypeDict["type"] == "symmetry":
+        elif boundaryTypeDict["type"] in ["symmetry", "symmetryPlane"]:
             symmetry_boundaries.append(boundary_name)
         elif boundaryTypeDict["type"] == "cyclic":
             cyclic_boundaries.append(boundary_name)
@@ -107,6 +113,7 @@ def main():
                             if st.form_submit_button(f"Save {boundary_name} Boundary Condition"):
                                 success, message = save_boundary_condition(field, boundary_name, bc, field_file_path)
                                 if success:
+                                    save_state(get_selected_case_path())
                                     st.success(message)
                                 else:
                                     st.error(message)
@@ -131,5 +138,6 @@ def main():
                                 field_file.boundary_field[boundary_name] = {"type": "cyclic"}
                             for boundary_name in symmetry_boundaries:
                                 field_file.boundary_field[boundary_name] = {"type": "symmetryPlane"}
+                        save_state(get_selected_case_path())
                     except Exception as e:
                         st.error(f"Error updating special boundaries: {str(e)}")

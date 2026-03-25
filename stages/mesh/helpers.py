@@ -32,7 +32,7 @@ def extract_zip(meshFile, polyMeshLoc):
 
   st.success(f'Saved the mesh into {polyMeshLoc}')
 
-def save_uploaded_file(uploadedfile, destination_folder, new_file_name):
+def save_uploaded_file(uploadedfile, destination_folder, new_file_name, overwrite=False):
     """
     Combines saving an uploaded file and renaming it.  This handles the
     in-memory nature of the UploadedFile object correctly.
@@ -60,7 +60,7 @@ def save_uploaded_file(uploadedfile, destination_folder, new_file_name):
     new_file_path = os.path.join(destination_folder, new_file_name)
 
     # Check if a file with the *new* name already exists
-    if os.path.exists(new_file_path):
+    if os.path.exists(new_file_path) and not overwrite:
         st.error(f"Error: A file with the name '{new_file_name}' already exists in '{destination_folder}'.")
         return False, None
 

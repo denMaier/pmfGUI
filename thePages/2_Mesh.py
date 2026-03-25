@@ -10,6 +10,7 @@ if get_selected_case_path() is None:
 elif not get_selected_case_path().exists(): #Better safe than sorry
     st.warning("Case does not exist. Please try Case Selection again.")
 else:
+    st.caption("Supported in alpha: OpenFOAM mesh import, blockMesh, and the current 2D cartesian2DMesh path when its executable is available.")
 
     col1, col2 = st.columns(2,gap="medium")
 
@@ -21,17 +22,21 @@ else:
             main3D()
 
         with twoD:
-                st.subheader("Load a mesh")
-                main2D()
+            st.subheader("Load a mesh")
+            main2D()
 
-                st.subheader("CellZones")
-                st.write("Coming soon")
-                st.subheader("Refinements")
-                st.write("Coming soon")
-                with st.expander("Surface Refinements"):
-                    st.write("Coming soon")
-                with st.expander("Volume Refinements"):
-                    st.write("Coming soon")
+            st.subheader("CellZones")
+            st.caption("Cell zone inspection is available after loading or generating a mesh.")
+            st.write("Current cell zone editing remains outside the alpha scope.")
+
+            st.subheader("Refinements")
+            st.warning("Advanced 2D refinements are experimental and disabled in alpha.")
+            with st.expander("Surface Refinements"):
+                st.number_input("Surface refinement level", value=0, disabled=True)
+                st.button("Apply Surface Refinements", disabled=True, key="surface_refinements_disabled")
+            with st.expander("Volume Refinements"):
+                st.number_input("Volume refinement level", value=0, disabled=True)
+                st.button("Apply Volume Refinements", disabled=True, key="volume_refinements_disabled")
 
     with col2:
         if has_mesh():

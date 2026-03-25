@@ -3,29 +3,45 @@ from foamlib import FoamCase, FoamFile
 from pathlib import Path
 import json
 import re
+from alpha_runtime import default_run_state, load_cell_zones
+from app_core import (
+    BC_TYPES,
+    FIELD_DEFAULT_VALUE,
+    FIELD_REGIONS,
+    PATHS,
+    POROFLUIDMODEL_TYPES,
+    SOLVER_OPTIONS,
+    SOLVER_TYPE_MAP,
+)
 
 def initialize_state():
     """Initializes the application's global state."""
     if "case_data" not in st.session_state:
         st.session_state.case_data = {}
-        case_data = st.session_state.case_data
-        case_data["Case"] = None  # Initialize Case
-        case_data["Case Selection"] = {
-                "selected_case": None
-        }
-        case_data["Mesh"] = {
-                    "cellZones": {}, # Since file format is hard to read
-                    "showMeshVis": False,
-                    "df_vertices": None, # For 2D Mesh generator
-                    "df_edges": None, # For 2D Mesh generator
-                    "edgeDict": {}, # For 2D Mesh generator
-                    "cellSize": 0.1, # For cfMesh
-                    "nBoundaryLayers": 0 # For cfMesh
-        }
-        case_data["Solver"] = {
-                    "selected": None,  # Initialize ALL values
-                    "unsaturated": False
-                }
+
+    case_data = st.session_state.case_data
+    case_data.setdefault("Case", None)
+    case_data.setdefault("Case Selection", {"selected_case": None})
+    case_data.setdefault(
+        "Mesh",
+        {
+            "cellZones": {},
+            "showMeshVis": False,
+            "df_vertices": None,
+            "df_edges": None,
+            "edgeDict": {},
+            "cellSize": 0.1,
+            "nBoundaryLayers": 0,
+        },
+    )
+    case_data.setdefault(
+        "Solver",
+        {
+            "selected": None,
+            "unsaturated": None,
+        },
+    )
+    case_data.setdefault("Run", default_run_state())
     if "vis" not in st.session_state:
         st.session_state.vis = {}
         vis = st.session_state.vis
@@ -38,95 +54,6 @@ def initialize_state():
         vis["only_boundaries"] = True
         vis["opacity"] = 1.0
         vis['available_regions'] = ['solid', 'poroFluid']
-
-PATHS = {
-"cellZones": "constant/polyMesh/cellZones",
-"boundary": "constant/polyMesh/boundary",
-"physicsProperties": "constant/physicsProperties",
-"solidProperties": "constant/solid/solidProperties",
-"poroFluidProperties": "constant/poroFluid/poroFluidProperties",
-"poroCouplingProperties": "constant/poroCouplingProperties",
-"mechanicalProperties": "constant/solid/mechanicalProperties",
-"poroHydraulicProperties": "constant/poroFluid/poroHydraulicProperties",
-"dotFoam": None,
-"blockMeshDict": None,
-"gSolid": "constant/solid/g",
-"gGroundwater": "constant/poroFluid/g"
-}
-
-SOLVER_OPTIONS = {
-    "Mechanics": {
-        "type": "solid",
-        "tabs": ["Mechanics"],
-        "fields": ["D"]
-    },
-    "Groundwater": {
-        "type": "poroFluid",
-        "tabs": ["Hydraulics"],
-        "fields": ["p_rgh"]
-    },
-    "Coupled": {
-        "type": "poroSolid",
-        "tabs": ["Coupling","Mechanics","Hydraulics"],
-        "fields": ["D","p_rgh"]
-    }
-}
-
-SOLVER_TYPE_MAP = {
-    "solid": "Mechanics",
-    "poroFluid": "Groundwater",
-    "poroSolid": "Coupled",
-    "None": "Mechanics" # Default
-}
-
-POROFLUIDMODEL_TYPES = {
-    "saturated": "poroFluid",
-    "unsaturated":"varSatPoroFluid"
-}
-
-FIELD_REGIONS = {
-    "p_rgh": "poroFluid",
-    "S": "poroFluid",
-    "k": "poroFluid",
-    "n": "poroFluid",
-    "D":"solid",
-    "epsilon":"solid",
-    "sigma":"solid",
-    "sigmaEff":"solid"
-}
-
-FIELD_DEFAULT_VALUE = {
-    "p_rgh": "uniform 0",
-    "S": "uniform 0",
-    "k": "uniform 1e-4",
-    "n": "uniform 0.5",
-    "D": "uniform (0 0 0)",
-    "epsilon": "uniform (0 0 0 0 0 0)",
-    "sigma": "uniform (0 0 0 0 0 0)",
-    "sigmaEff":"uniform (0 0 0 0 0 0)"
-}
-
-BC_TYPES = {
-    "p_rgh": [
-        "fixedValue",
-        "zeroGradient",
-        "fixedPotential",
-        "fixedPoroFlux",
-        "seepageOutlet"
-        "empty",
-        "symmetry",
-        "cyclic",
-        "fixedGradient",
-        "mixed",
-        "directionMixed",
-        "fixedFluxPressure",
-        "noSlip",
-        "slip"
-    ],
-    "D": [
-
-    ]
-}
 #Access
 def get_case():
     """Provides access to the Case Object."""
@@ -148,13 +75,13 @@ def get_selected_case_name():
 
 def get_solver_type():
     selected = get_case_data()["Solver"].get("selected")
-    physicsProperties = get_file("physicsProperties")
     if selected is None:
+        physicsProperties = get_file("physicsProperties")
         selected = SOLVER_TYPE_MAP[physicsProperties["type"]]
     return selected
 
 def is_unsaturated():
-    solver = get_case_data()["Solver"].get("selected")
+    solver = get_solver_type()
     if solver in ["Coupled","Groundwater"]:
         poroFluidProperties = get_file("poroFluidProperties")
         if st.session_state.case_data["Solver"].get("unsaturated") is None and poroFluidProperties is not None:
@@ -212,9 +139,15 @@ def get_file(filename: str) -> FoamFile:
 def set_selected_case(case_name,case_dir):
     st.session_state.case_data["Case Selection"]["selected_case"] = case_name
     st.session_state.case_data["Case"] = FoamCase(Path(case_dir))
+    st.session_state.case_data["Mesh"]["cellZones"] = {}
+    st.session_state.case_data["Mesh"]["showMeshVis"] = False
+    st.session_state.case_data["Solver"]["selected"] = None
+    st.session_state.case_data["Solver"]["unsaturated"] = None
+    st.session_state.case_data["Run"] = default_run_state()
 
 def set_solver_type(solver_type):
     st.session_state.case_data["Solver"]["selected"] = solver_type
+    st.session_state.case_data["Solver"]["unsaturated"] = None
     physicsProperties = get_file("physicsProperties")
     if physicsProperties is not None:
         with physicsProperties:
@@ -234,7 +167,7 @@ def load_state(case_dir: Path) -> None:
         # Merge loaded state into current session state, avoid overwriting 'Case'
         case_data = st.session_state.case_data
         for key, value in loaded_state.items():
-            if key != "Case": # Do not load Case from state file
+            if key not in {"Case", "Run"}: # Run state is stored separately
                 case_data[key] = value
         st.success(f"Loaded state from: {state_file_path}")
     except FileNotFoundError:
@@ -271,7 +204,7 @@ def save_state(case_dir: Path) -> None:
     # Extract state to save (exclude FoamCase and file_mtimes)
     state_to_save = {
         key: value for key, value in st.session_state.case_data.items()
-        if key not in ["Case", "file_mtimes"]
+        if key not in ["Case", "Run", "file_mtimes"]
     }
 
     try:
@@ -293,32 +226,23 @@ def load_case_cell_zones():
               cellZones are found or if an error occurs.
     """
 
-    filePath = Path(PATHS["cellZones"])
+    case_path = get_selected_case_path()
+    if case_path is None:
+        st.warning("No case selected. Please select a case first.")
+        return
+
+    filePath = case_path / PATHS["cellZones"]
+    get_case_data()["Mesh"]["cellZones"] = {}
 
     if not filePath.exists():
         st.warning("No CellZones exist! Please create at least one cellZone!")
         return
 
     try:
-        with filePath.open() as f:
-            content = f.read()
-
-        # Regex to find cellZone names, robust to whitespace and header.
-        # We now skip the FoamFile header section.
-        match = re.search(r"FoamFile\s*\{.*?\}\s*(.*)", content, re.DOTALL)
-        if match:
-            content_after_header = match.group(1)
-            matches = re.findall(r'(\w+)\s*\{', content_after_header)
-            for zonematch in matches:
-                get_case_data()["Mesh"]["cellZones"][zonematch] = {
-                    "type": None,
-                    "parameters": {}
-                }
-        else:
+        get_case_data()["Mesh"]["cellZones"] = load_cell_zones(case_path)
+        if not get_case_data()["Mesh"]["cellZones"]:
             st.error("No cellZones in cellZone file found!!")
-
     except FileNotFoundError:
         print(f"Error: File not found at {filePath}")
-
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
