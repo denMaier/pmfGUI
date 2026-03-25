@@ -2,9 +2,8 @@
 Classes for representing OpenFOAM boundary conditions with an abstract Function1 base class
 and registration pattern to easily add new implementations.
 """
-from tkinter.constants import SEL
 from typing import Dict, List, Union, Optional, Any, Type, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import numpy as np
 import streamlit as st
 import re

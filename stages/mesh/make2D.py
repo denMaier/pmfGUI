@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import json
 
-from vtkmodules.vtkCommonDataModel import vtkVertex
 from state import *
 
 @st.dialog("2D Mesh Generator", width="large")

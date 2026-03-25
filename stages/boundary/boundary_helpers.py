@@ -1,12 +1,9 @@
 """
 UI functions for boundary condition editing using the class-based approach.
 """
-from pandas.core.arrays.base import isin
 import streamlit as st
-from typing import Dict, List, Tuple, Any, Optional
-import re
+from typing import Dict, Tuple, Any
 from pathlib import Path
-import numpy as np
 from foamlib import FoamFieldFile
 
 from stages.boundary.boundary_condition import BoundaryCondition, get_boundary_condition_types
@@ -30,7 +27,7 @@ def select_boundary_condition_type(field: str, boundary_name: str, current_type:
 
     # Initialize selection state if not exists
     selection_key = f'select_{field}_{boundary_name}'
-    if f'bc_selections_{field}' not in st.session_state:
+    if "boundary" not in st.session_state:
         st.session_state["boundary"] = {}
 
     if selection_key not in st.session_state["boundary"]:

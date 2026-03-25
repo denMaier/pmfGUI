@@ -1,4 +1,4 @@
-from stages.boundary.boundary_conditions import BoundaryCondition
+from stages.boundary.boundary_condition import BoundaryCondition
 from stages.boundary.function1 import UniformFunction1
 
 # Dictionary of boundary condition templates using GenericFunction1

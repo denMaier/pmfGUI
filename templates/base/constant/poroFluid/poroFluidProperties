@@ -26,7 +26,6 @@ varSatPoroFluidCoeffs
     {
         "S"             max 0.001;
     }
-    solutionAlgorithm Standard;
     enabled         1;
     maxIterAbort    false;
     interval        0;

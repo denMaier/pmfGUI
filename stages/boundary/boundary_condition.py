@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import streamlit as st
 from stages.boundary.function1 import Function1, Function1Registry
-from boundaryConditions.boundary_templates import BOUNDARY_CONDITION_TEMPLATES
 
 
 @dataclass
@@ -69,7 +68,7 @@ class BoundaryCondition:
             if isinstance(entry_value, Function1):
                 updated_entries[entry_key] = entry_value.render_ui(
                     entry_key,
-                    f"{field}_{boundary_name}_{entry_key}")  # Skip selector if using from session
+                    f"{entry}_{boundary_name}_{entry_key}")  # Skip selector if using from session
             elif isinstance(entry_value, (list, np.ndarray)) and len(entry_value) == 3:
                 # Render vector entries
                 cols = st.columns(3)
@@ -137,6 +136,8 @@ class BoundaryCondition:
 
 def get_boundary_condition_template(field: str, bc_type: str) -> BoundaryCondition:
     """Get a boundary condition template for a field and type."""
+    from boundaryConditions.boundary_templates import BOUNDARY_CONDITION_TEMPLATES
+
     # Try to get the template for the specific field
     field_templates = BOUNDARY_CONDITION_TEMPLATES.get(field, {})
 
@@ -149,5 +150,7 @@ def get_boundary_condition_template(field: str, bc_type: str) -> BoundaryConditi
 
 def get_boundary_condition_types(field: str) -> List[str]:
     """Get available boundary condition types for a field."""
+    from boundaryConditions.boundary_templates import BOUNDARY_CONDITION_TEMPLATES
+
     field_templates = BOUNDARY_CONDITION_TEMPLATES.get(field, {})
     return list(field_templates.keys())

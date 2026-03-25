@@ -1,10 +1,8 @@
-from panel.io.server import get_server
 import streamlit as st
-from foamlib import FoamCase, FoamFile
+from foamlib import FoamFile
 from pathlib import Path
 from state import *
 from render_inputs import render_input_element
-import os
 import pandas as pd
 
 
@@ -64,7 +62,7 @@ def set_solver_type_settings():
             if selected_solver in ["Groundwater","Coupled"]:
                 ddt_options = ["steadyState", "Euler", "CrankNicolson 0.9", "backward"]
                 fvSchemesDict["ddtSchemes"]["default"] = st.selectbox("default", ddt_options, index=ddt_options.index(fvSchemesDict["ddtSchemes"]["default"]))
-            if selected_solver in ["Mechanics,Coupled"]:
+            if selected_solver in ["Mechanics","Coupled"]:
                 if st.toggle("Dynamic Calculation"):
                     st.write("At the moment no dynamic calculations in the GUI, please edit end run the case manually.")
 
@@ -86,6 +84,7 @@ def set_solver_type_settings():
                 fluidmodel = st.selectbox("Model",list(POROFLUIDMODEL_TYPES.keys()),index=fluidModelIndex)
                 fluidmodel = POROFLUIDMODEL_TYPES[fluidmodel]
                 poroFluidDict["poroFluidModel"] = fluidmodel
+                case_data["Solver"]["unsaturated"] = fluidmodel == "varSatPoroFluid"
                 coeffsDict = poroFluidDict[f"{fluidmodel}Coeffs"]
                 current_iterations = int(coeffsDict["iterations"])
                 poroFluidDict[f"{fluidmodel}Coeffs"]["iterations"] = st.number_input(
@@ -133,7 +132,7 @@ def set_solver_type_settings():
 
             with(
                 get_case().fv_schemes as fvSchemes,
-                get_case().fv_schemes as fvSolution,
+                get_case().fv_solution as fvSolution,
                 get_file('poroCouplingProperties') as poroCouplingProperties,
                 get_file("poroFluidProperties") as poroFluidProperties,
                 get_file('solidProperties') as solidProperties

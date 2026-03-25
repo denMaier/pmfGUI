@@ -131,7 +131,7 @@ class OpenFOAMVisualizer:
                 # Add the original directory name (not converted to float)
                 time_dirs.append(item.name)
         time_dirs.sort(key=lambda x: float(x) if x != 'constant' else -1)
-        return sorted(time_dirs)
+        return time_dirs
 
     def _get_latest_time(self) -> str:
         """Get the latest time directory."""

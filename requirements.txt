@@ -1,5 +1,12 @@
 streamlit
 foamlib
-pathlib
-stpyvista
 st-annotated-text
+numpy
+pandas
+altair
+pyvista
+matplotlib
+nest_asyncio2
+trame
+trame-vtk
+trame-vuetify

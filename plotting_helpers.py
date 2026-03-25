@@ -1,7 +1,5 @@
 import streamlit as st
 from OpenFOAMVisualizer import OpenFOAMVisualizer
-from pathlib import Path
-import pyvista as pv
 
 
 # Create a singleton visualizer to ensure we only create one instance

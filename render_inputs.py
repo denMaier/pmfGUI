@@ -41,6 +41,9 @@ def render_input_element(key, value, key_prefix=None, allowed_values=None):
                     render_input_element(f"[{i}]", item, key_prefix=element_key, allowed_values=allowed_values)
                 )
             return selected_values
+    elif isinstance(value, bool):
+        new_value = st.toggle(f"{key}:", value=value, key=element_key)
+        return new_value
     elif isinstance(value, int):
         new_value = st.number_input(f"{key}:", value=value, key=element_key, step=1) # step=1 for integers
         return new_value
@@ -63,9 +66,6 @@ def render_input_element(key, value, key_prefix=None, allowed_values=None):
         with vector[2]:
             gz = st.number_input("z", value=v3, key=f"{element_key}_z")
         return (gx, gy, gz)
-    elif isinstance(value, bool):
-        new_value = st.toggle(f"{key}:", value=value, key=element_key)
-        return new_value
     else:
         st.text(f"{key}: {value} (Unsupported type)")
         return value
